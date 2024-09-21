@@ -1,0 +1,26 @@
+<!-- GameSelectionGroup.html -->
+<!DOCTYPE html>
+<html>
+  <body>
+    <form id="gameForm">
+      <label for="gameSelect">Select Game for the Group:</label>
+      <select name="game" id="gameSelect">
+        <? var games = supportedGames; ?>
+        <? for (var i = 0; i < games.length; i++) { ?>
+          <option value="<?= games[i] ?>"><?= games[i] ?></option>
+        <? } ?>
+      </select><br><br>
+      <input type="submit" value="Select Game">
+    </form>
+
+    <script>
+      document.getElementById('gameForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        var selectedGame = document.getElementById('gameSelect').value;
+        google.script.run.withSuccessHandler(function() {
+          google.script.host.close();
+        }).proceedGroupCheckIn(selectedGame);
+      });
+    </script>
+  </body>
+</html>

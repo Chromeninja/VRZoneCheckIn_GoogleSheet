@@ -1,0 +1,29 @@
+<!-- File Name: CheckOutSelection.html -->
+<!DOCTYPE html>
+<html>
+  <body>
+    <form id="checkOutForm">
+      <label for="vrSpaceSelect">Select VR Spaces to Check Out:</label><br><br>
+      <select id="vrSpaceSelect" multiple size="10" style="width: 100%;">
+        <? var spaces = occupiedSpaces; ?>
+        <? for (var i = 0; i < spaces.length; i++) { ?>
+          <option value="<?= spaces[i].space ?>"><?= spaces[i].space ?> - <?= spaces[i].firstName ?></option>
+        <? } ?>
+      </select><br><br>
+      <input type="submit" value="Check Out Selected">
+    </form>
+    <script>
+      document.getElementById('checkOutForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        var selectedOptions = document.getElementById('vrSpaceSelect').selectedOptions;
+        var selectedSpaces = [];
+        for (var i = 0; i < selectedOptions.length; i++) {
+          selectedSpaces.push(selectedOptions[i].value);
+        }
+        google.script.run.withSuccessHandler(function() {
+          google.script.host.close();
+        }).processCheckOut(selectedSpaces);
+      });
+    </script>
+  </body>
+</html>

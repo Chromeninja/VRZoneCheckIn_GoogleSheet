@@ -1,0 +1,26 @@
+<!-- File Name: WaitlistSelection.html -->
+<!DOCTYPE html>
+<html>
+  <body>
+    <form id="waitlistForm">
+      <label for="waitlistSelect"><?= title ?></label>
+      <select id="waitlistSelect">
+        <? var entries = waitlistEntries; ?>
+        <? for (var i = 0; i < entries.length; i++) { ?>
+          <option value="<?= entries[i].sessionId ?>"><?= entries[i].firstName ?> - <?= entries[i].game ?></option>
+        <? } ?>
+      </select><br><br>
+      <input type="submit" value="<?= buttonLabel ?>">
+    </form>
+    <script>
+      var callbackFunction = '<?= callbackFunction ?>';
+      document.getElementById('waitlistForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        var selectedSessionId = document.getElementById('waitlistSelect').value;
+        google.script.run.withSuccessHandler(function() {
+          google.script.host.close();
+        })[callbackFunction](selectedSessionId);
+      });
+    </script>
+  </body>
+</html>

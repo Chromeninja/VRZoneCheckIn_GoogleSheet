@@ -1,0 +1,30 @@
+<!-- File Name: VRSpaceSelection.html -->
+<!DOCTYPE html>
+<html>
+  <body>
+    <form id="vrSpaceForm">
+      <label for="vrSpaceSelect">Select VR Space:</label>
+      <select id="vrSpaceSelect">
+        <? var spaces = availableSpaces; ?>
+        <? for (var i = 0; i < spaces.length; i++) { ?>
+          <option value="<?= spaces[i] ?>"><?= spaces[i] ?></option>
+        <? } ?>
+      </select><br><br>
+      <input type="submit" value="Assign">
+    </form>
+    <script>
+      var attendeeDataJSON = '<?= attendeeData ?>';
+      var selectedGame = '<?= selectedGame ?>';
+      var sessionId = '<?= sessionId ?>';
+      var callbackFunction = '<?= callbackFunction ?>';
+
+      document.getElementById('vrSpaceForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        var selectedSpace = document.getElementById('vrSpaceSelect').value;
+        google.script.run.withSuccessHandler(function() {
+          google.script.host.close();
+        })[callbackFunction](selectedSpace, attendeeDataJSON, selectedGame, sessionId);
+      });
+    </script>
+  </body>
+</html>

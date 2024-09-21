@@ -1,0 +1,33 @@
+<!-- GroupVRSpaceSelection.html -->
+<!DOCTYPE html>
+<html>
+  <body>
+    <form id="groupVRSpaceForm">
+      <label for="vrSpaceSelect">Select VR Spaces for the Group:</label><br><br>
+      <select id="vrSpaceSelect" multiple size="10" style="width: 100%;">
+        <? var spaces = availableSpaces; ?>
+        <? for (var i = 0; i < spaces.length; i++) { ?>
+          <option value="<?= spaces[i].space ?>"><?= spaces[i].space ?> - <?= spaces[i].firstName ?></option>
+        <? } ?>
+      </select><br><br>
+      <input type="submit" value="Assign VR Spaces">
+    </form>
+    <script>
+      var selectedGame = '<?= selectedGame ?>';
+      var groupNumber = '<?= groupNumber ?>';
+      var groupMembersJSON = '<?= groupMembers ?>';
+
+      document.getElementById('groupVRSpaceForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        var selectedOptions = document.getElementById('vrSpaceSelect').selectedOptions;
+        var selectedSpaces = [];
+        for (var i = 0; i < selectedOptions.length; i++) {
+          selectedSpaces.push(selectedOptions[i].value);
+        }
+        google.script.run.withSuccessHandler(function() {
+          google.script.host.close();
+        }).assignVRSpacesToGroup(selectedSpaces, selectedGame, groupNumber, groupMembersJSON);
+      });
+    </script>
+  </body>
+</html>

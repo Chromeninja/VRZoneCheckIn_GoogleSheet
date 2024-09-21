@@ -1,0 +1,25 @@
+<!-- File Name: NoShowSelection.html -->
+<!DOCTYPE html>
+<html>
+  <body>
+    <form id="noShowForm">
+      <label for="noShowSelect">Select Attendee to Mark as No Show:</label>
+      <select id="noShowSelect">
+        <? var attendees = waitingAttendees; ?>
+        <? for (var i = 0; i < attendees.length; i++) { ?>
+          <option value="<?= attendees[i].sessionId ?>"><?= attendees[i].firstName ?> <?= attendees[i].lastName ?></option>
+        <? } ?>
+      </select><br><br>
+      <input type="submit" value="Mark as No Show">
+    </form>
+    <script>
+      document.getElementById('noShowForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        var selectedSessionId = document.getElementById('noShowSelect').value;
+        google.script.run.withSuccessHandler(function() {
+          google.script.host.close();
+        }).processMarkAsNoShow(selectedSessionId);
+      });
+    </script>
+  </body>
+</html>
