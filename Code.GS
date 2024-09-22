@@ -186,61 +186,61 @@ function checkIn() {
 }
 
 /**
- * Retrieves attendee information for individual check-in.
+ * Retrieves attendee information for individual check-in with retry logic for incorrect names.
  * @returns {Object|null} - The attendee object or null if not found/cancelled.
  */
 function getIndividualAttendeeInfo() {
   var ui = SpreadsheetApp.getUi();
-  var firstNameResponse = ui.prompt('Individual Check-In', 'Please enter the first name of the attendee:', ui.ButtonSet.OK_CANCEL);
-  
-  if (firstNameResponse.getSelectedButton() !== ui.Button.OK) {
-    ui.alert('Operation cancelled.');
-    return null;
-  }
+  var firstNameResponse, firstName, lastName, matches;
 
-  var firstName = firstNameResponse.getResponseText().trim().toLowerCase();
-  if (!firstName) {
-    ui.alert('First name is required.');
-    return null;
-  }
-
-  var matches = getAttendeeInfo(firstName);
-  
-  if (matches.length === 1) {
-    return matches[0];
-  }
-
-  if (matches.length > 1) {
-    var lastNameResponse = ui.prompt('Multiple Matches Found', 'Multiple attendees found with the first name "' + capitalize(firstName) + '". Please enter the last name:', ui.ButtonSet.OK_CANCEL);
-    if (lastNameResponse.getSelectedButton() !== ui.Button.OK) {
+  // Retry loop for first name
+  while (true) {
+    firstNameResponse = ui.prompt('Individual Check-In', 'Please enter the first name of the attendee:', ui.ButtonSet.OK_CANCEL);
+    
+    if (firstNameResponse.getSelectedButton() !== ui.Button.OK) {
       ui.alert('Operation cancelled.');
       return null;
     }
 
-    var lastName = lastNameResponse.getResponseText().trim().toLowerCase();
-    if (!lastName) {
-      ui.alert('Last name is required.');
-      return null;
+    firstName = firstNameResponse.getResponseText().trim().toLowerCase();
+    if (!firstName) {
+      ui.alert('First name is required.');
+      continue; // Retry entering first name
     }
 
-    matches = getAttendeeInfo(firstName, lastName);
+    matches = getAttendeeInfo(firstName);
+
     if (matches.length === 1) {
-      if (matches.length > 1) {
-        setErrorFlag(SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tracker'), matches[0].uniqueId, 'Multiple matches found. Used first match.');
-      }
-      return matches[0];
-    } else if (matches.length === 0) {
-      ui.alert('No attendee found with that first and last name.');
-      return null;
-    } else {
-      // Multiple matches even after providing last name, use first and log error
-      setErrorFlag(SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tracker'), matches[0].uniqueId, 'Multiple matches found. Used first match.');
       return matches[0];
     }
-  }
 
-  ui.alert('No attendee found with that first name.');
-  return null;
+    if (matches.length > 1) {
+      // Retry loop for last name if multiple matches found
+      while (matches.length > 1) {
+        var lastNameResponse = ui.prompt('Multiple Matches Found', 'Multiple attendees found with the first name "' + capitalize(firstName) + '". Please enter the last name:', ui.ButtonSet.OK_CANCEL);
+        
+        if (lastNameResponse.getSelectedButton() !== ui.Button.OK) {
+          ui.alert('Operation cancelled.');
+          return null;
+        }
+
+        lastName = lastNameResponse.getResponseText().trim().toLowerCase();
+        if (!lastName) {
+          ui.alert('Last name is required.');
+          continue; // Retry entering last name
+        }
+
+        matches = getAttendeeInfo(firstName, lastName);
+      }
+
+      if (matches.length === 1) {
+        return matches[0];
+      }
+    }
+
+    // If no matches are found, prompt the user to retry
+    ui.alert('No attendee found with that first name. Please try again.');
+  }
 }
 
 /**
@@ -425,6 +425,7 @@ function groupCheckIn() {
 /**
  * Verifies a group member's information based on first and last name.
  * If multiple matches exist, uses the first match and logs an error.
+ * Implements retry logic for incorrect or missing names.
  * @param {string} firstName - The first name of the group member.
  * @param {string} lastName - The last name of the group member.
  * @param {string} role - The role of the group member (e.g., "Group Leader", "Group Member 2").
@@ -434,18 +435,55 @@ function verifyGroupMember(firstName, lastName, role) {
   var ui = SpreadsheetApp.getUi();
   var matches = getAttendeeInfo(firstName, lastName);
 
+  // Retry loop for first and last name
+  while (matches.length === 0) {
+    var retryFirstNameResponse = ui.prompt(role, 'No attendee found with the first name "' + capitalize(firstName) + '". Please try again or click Cancel to exit.', ui.ButtonSet.OK_CANCEL);
+    
+    if (retryFirstNameResponse.getSelectedButton() !== ui.Button.OK) {
+      ui.alert('Operation cancelled.');
+      return null;
+    }
+    
+    firstName = retryFirstNameResponse.getResponseText().trim().toLowerCase();
+    if (!firstName) {
+      ui.alert('First name is required.');
+      continue; // Retry entering first name
+    }
+
+    matches = getAttendeeInfo(firstName); // Re-run with the new first name
+
+    if (matches.length > 1) {
+      // Retry loop for last name if multiple matches found
+      var retryLastNameResponse = ui.prompt(role, 'Multiple attendees found with the first name "' + capitalize(firstName) + '". Please enter the last name or click Cancel to exit.', ui.ButtonSet.OK_CANCEL);
+      
+      if (retryLastNameResponse.getSelectedButton() !== ui.Button.OK) {
+        ui.alert('Operation cancelled.');
+        return null;
+      }
+      
+      lastName = retryLastNameResponse.getResponseText().trim().toLowerCase();
+      if (!lastName) {
+        ui.alert('Last name is required.');
+        continue; // Retry entering last name
+      }
+      
+      matches = getAttendeeInfo(firstName, lastName);
+    }
+  }
+
+  // If we get a single match or after retries, use the found member
   if (matches.length === 1) {
     return matches[0];
   }
 
+  // If still multiple matches, use the first match but log the issue
   if (matches.length > 1) {
-    // Use the first match and log an error
     setErrorFlag(SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tracker'), matches[0].uniqueId, role + ': Multiple matches found. Used first match.');
     return matches[0];
-		
   }
 
-  ui.alert('No attendee found with that first and last name for ' + role + '.');
+  // If no match after retries, return null
+  ui.alert('No attendee found with the provided names for ' + role + '.');
   return null;
 }
 
