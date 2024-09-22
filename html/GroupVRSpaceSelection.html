@@ -1,26 +1,6 @@
 <!-- File Name: GroupVRSpaceSelection.html -->
 <!DOCTYPE html>
 <html>
-  <head>
-    <base target="_top">
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        padding: 20px;
-      }
-      .vr-space-selection {
-        margin-bottom: 15px;
-      }
-      .submit-button {
-        margin-top: 20px;
-      }
-      select {
-        width: 100%;
-        padding: 8px;
-        box-sizing: border-box;
-      }
-    </style>
-  </head>
   <body>
     <form id="vrSpaceForm">
       <? for (var i = 0; i < groupSize; i++) { ?>
@@ -41,7 +21,9 @@
       function submitSelection() {
         var selectedSpaces = [];
         var groupSize = <?= groupSize ?>;
+        var sessionId = '<?= generateSessionID("group") ?>'; // Generate session ID for the group check-in
 
+        // Collect selected spaces
         for (var i = 0; i < groupSize; i++) {
           var space = document.getElementById('space' + i).value;
           if (!space) {
@@ -58,9 +40,29 @@
           return;
         }
 
+        // Check if there are not enough spaces and trigger waitlist prompt directly
+        if (selectedSpaces.length < groupSize) {
+          // Prompt user to add to waitlist
+          var confirmWaitlist = confirm('Not enough VR spaces available for the group. Would you like to add the group to the waitlist?');
+          if (confirmWaitlist) {
+            var phoneNumber = prompt('Please enter the group leader\'s phone number:');
+            if (phoneNumber) {
+              // After collecting the phone number, call the backend to add to waitlist
+              google.script.run.withSuccessHandler(function() {
+                alert('Group added to the waitlist successfully.');
+                google.script.host.close();
+              }).addGroupToWaitlist(<?= groupMembers ?>, '<?= selectedGame ?>', sessionId, groupSize, <?= groupNumber ?>, phoneNumber);
+            } else {
+              alert('Phone number is required to add the group to the waitlist.');
+            }
+          }
+          return;
+        }
+
+        // If all spaces are selected and valid, proceed with assigning spaces
         google.script.run.withSuccessHandler(function() {
           google.script.host.close();
-        }).assignVRSpacesToGroup(selectedSpaces, '<?= selectedGame ?>', <?= groupNumber ?>, '<?= groupMembers ?>');
+        }).assignVRSpacesToGroup(selectedSpaces, '<?= selectedGame ?>', <?= groupNumber ?>, '<?= groupMembers ?>', sessionId); 
       }
     </script>
   </body>

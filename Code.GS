@@ -43,8 +43,6 @@ function getAttendeeInfo(firstName, lastName = null) {
 
   firstName = firstName.toLowerCase();
   if (lastName) lastName = lastName.toLowerCase();
-   
-
   for (var i = 1; i < data.length; i++) { // Assuming the first row is headers
     var sheetFirstName = data[i][3]; // Adjust column index based on your sheet
     var sheetLastName = data[i][4];  // Adjust column index based on your sheet
@@ -78,7 +76,6 @@ function getAttendeeInfo(firstName, lastName = null) {
       }
     }
   }
-
   return matches;
 }
 
@@ -125,31 +122,29 @@ function checkDuplicateFirstName(firstName) {
   return gamesArray;
 }
 
-
 /**
  * Finds available VR spaces for a selected game.
  * @param {string} game - The selected game.
  * @param {Sheet} vrSheet - The VRSpaces sheet.
  * @returns {Array} - An array of available VR space names.
  */
-function findAvailableSpacesForGame(game, vrSheet) {
+function findAvailableSpacesForGame(selectedGame, vrSheet) {
   var data = vrSheet.getDataRange().getValues();
   var availableSpaces = [];
 
-  for (var i = 1; i < data.length; i++) { // Assuming the first row is headers
-    var vrSpace = data[i][0];           // VR Space Name
-    var supportedGames = data[i][1];    // Supported Games
-    var status = data[i][2];            // Status
-
-    if (status.toString().trim().toLowerCase() === "available" && supportedGames) {
-      var gamesList = supportedGames.split(',').map(function(s) { return s.trim(); });
-      if (gamesList.includes(game)) {
-        availableSpaces.push(vrSpace);
-      }
+  for (var i = 1; i < data.length; i++) { // Assuming row 1 contains headers
+    var status = data[i][1]; // Column where status (Available/Occupied) is stored
+    var supportedGames = data[i][2]; // Column where supported games are stored
+    if (status === 'Available' && supportedGames.includes(selectedGame)) {
+      availableSpaces.push(data[i][0]); // Assuming VR space names are in column 0
     }
   }
+
+  // Log available spaces for debugging
+  Logger.log('Available spaces for game ' + selectedGame + ': ' + availableSpaces.length);
   return availableSpaces;
 }
+
 
 /**
  * Logs an error in the Tracker sheet based on session ID.
@@ -445,7 +440,6 @@ function verifyGroupMember(firstName, lastName, role) {
     // Use the first match and log an error
     setErrorFlag(SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tracker'), matches[0].uniqueId, role + ': Multiple matches found. Used first match.');
     return matches[0];
-		
   }
 
   ui.alert('No attendee found with that first and last name for ' + role + '.');
@@ -462,25 +456,31 @@ function selectGameGroup(selectedGame) {
   var groupMembers = JSON.parse(groupMembersJSON);
   var groupSize = groupMembers.length;
   var groupNumber = generateGroupNumber();
-    var vrSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VRSpaces');
+  
+  var vrSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VRSpaces');
   var availableSpaces = findAvailableSpacesForGame(selectedGame, vrSheet);
+
+  // Log the number of available spaces and group size for debugging
+  Logger.log('Available spaces: ' + availableSpaces.length);
+  Logger.log('Group size: ' + groupSize);
 
   if (availableSpaces.length < groupSize) {
     // Not enough spaces for the entire group
+    Logger.log('Not enough VR spaces available for the group.');
     SpreadsheetApp.getUi().alert('Not enough VR spaces available for the group.');
-      return;
-    }
+    return;
+  }
 
-  // Prompt to select multiple VR spaces for the group
-    var template = HtmlService.createTemplateFromFile('GroupVRSpaceSelection');
-    template.availableSpaces = availableSpaces;
-    template.groupSize = groupSize;
-    template.groupMembers = JSON.stringify(groupMembers);
-    template.selectedGame = selectedGame;
-    template.groupNumber = groupNumber;
+  // Proceed with the group VR space selection
+  var template = HtmlService.createTemplateFromFile('GroupVRSpaceSelection');
+  template.availableSpaces = availableSpaces;
+  template.groupSize = groupSize;
+  template.groupMembers = JSON.stringify(groupMembers);
+  template.selectedGame = selectedGame;
+  template.groupNumber = groupNumber;
 
-    var htmlOutput = template.evaluate().setWidth(400).setHeight(300);
-    SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Assign VR Spaces to Group');
+  var htmlOutput = template.evaluate().setWidth(400).setHeight(300);
+  SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Assign VR Spaces to Group');
 }
 
 /**
@@ -492,39 +492,64 @@ function generateGroupNumber() {
 }
 
 /**
+ * Finds the row for a given VR space in the VRSpaces sheet.
+ * @param {Sheet} vrSheet - The VRSpaces sheet.
+ * @param {string} selectedSpace - The VR space to find.
+ * @returns {number} The row number of the VR space, or -1 if not found.
+ */
+function findRowForVRSpace(vrSheet, selectedSpace) {
+  var data = vrSheet.getDataRange().getValues(); // Get all the data from the sheet
+  for (var i = 1; i < data.length; i++) { // Start at 1 to skip the header row
+    if (data[i][0] === selectedSpace) { // Assuming the VR space is in the first column
+      return i + 1; // Return the row number (adjust for 1-based indexing)
+    }
+  }
+  return -1; // Return -1 if the space is not found
+}
+
+/**
  * Assigns VR spaces to the group members based on selected spaces.
  * @param {Array} selectedSpaces - Array of selected VR space names.
  * @param {string} selectedGame - The selected game for the group.
  * @param {number} groupNumber - The unique group number.
  * @param {string} groupMembersJSON - JSON string of group members.
  */
-function assignVRSpacesToGroup(selectedSpaces, selectedGame, groupNumber, groupMembersJSON) {
+function assignVRSpacesToGroup(selectedSpaces, selectedGame, groupNumber, groupMembersJSON, sessionId) {
+  // Ensure sessionId is passed properly
+  if (!sessionId) {
+    sessionId = generateSessionID();
+  }
+
   try {
     var vrSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VRSpaces');
     var trackerSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tracker');
-
     var groupMembers = JSON.parse(groupMembersJSON);
     var checkInTime = new Date();
 
+    // Check if there are enough spaces for the group
     if (selectedSpaces.length < groupMembers.length) {
-      SpreadsheetApp.getUi().alert('Number of selected VR spaces is less than the number of group members.');
-      return;
+      // Trigger waitlist flow if not enough spaces
+      promptForGroupWaitlist(groupMembers, selectedGame, sessionId, groupMembers.length, groupNumber);
+      return; 
     }
 
-    // Ensure no duplicate VR spaces are assigned
-    var uniqueSpaces = new Set(selectedSpaces);
-    if (uniqueSpaces.size !== selectedSpaces.length) {
-      SpreadsheetApp.getUi().alert('Duplicate VR spaces selected. Please assign unique VR spaces to each group member.');
-      return;
-    }
-
+    // Loop over each group member and assign them to the VR space
     for (var i = 0; i < groupMembers.length; i++) {
       var attendee = groupMembers[i];
-      var sessionId = generateSessionID(attendee.uniqueId || '');
-
       var selectedSpace = selectedSpaces[i];
+
+      // Update the Tracker sheet for check-in
       updateCheckInTrackerGroup(trackerSheet, attendee, selectedSpace, selectedGame, sessionId, attendee.isLeader, groupNumber);
-      updateVRSpaces(vrSheet, selectedSpace, attendee, selectedGame, sessionId);
+
+      // Update the VRSpaces sheet
+      var rowToUpdate = findRowForVRSpace(vrSheet, selectedSpace);
+      if (rowToUpdate !== -1) {
+        vrSheet.getRange(rowToUpdate, 4).setValue(attendee.firstName); // Assign First Name
+        vrSheet.getRange(rowToUpdate, 5).setValue(selectedGame); // Assign Game
+        vrSheet.getRange(rowToUpdate, 6).setValue(sessionId); // Assign Session ID
+        vrSheet.getRange(rowToUpdate, 7).setValue(checkInTime); // Set Check-In Time
+        vrSheet.getRange(rowToUpdate, 3).setValue("Occupied"); // Set Status to "Occupied"
+      }
     }
 
     SpreadsheetApp.getUi().alert('Group check-in completed successfully.');
@@ -534,11 +559,12 @@ function assignVRSpacesToGroup(selectedSpaces, selectedGame, groupNumber, groupM
   }
 }
 
+
 /**
- * Updates the Tracker sheet for group check-in.
+ * Updates the Tracker sheet for group check-in and waitlist.
  * @param {Sheet} trackerSheet - The Tracker sheet.
  * @param {Object} attendee - The attendee object.
- * @param {string} selectedSpace - The assigned VR space.
+ * @param {string} selectedSpace - The assigned VR space (use 'Waitlist' if waitlisted).
  * @param {string} selectedGame - The selected game.
  * @param {string} sessionId - The session ID.
  * @param {boolean} isLeader - Indicates if the attendee is the group leader.
@@ -552,14 +578,18 @@ function updateCheckInTrackerGroup(trackerSheet, attendee, selectedSpace, select
   var data = trackerSheet.getDataRange().getValues();
   var visitCount = 1;
   for (var i = 1; i < data.length; i++) {
-    if (data[i][1] === attendee.uniqueId) {
-      var previousVisitCount = data[i][16];
+    if (data[i][1] === attendee.uniqueId) { // Assuming Column B holds unique IDs
+      var previousVisitCount = data[i][16]; // Assuming Column Q holds visit count
       if (previousVisitCount && !isNaN(previousVisitCount)) {
         visitCount = Math.max(visitCount, parseInt(previousVisitCount) + 1);
       }
     }
   }
 
+  // Determine session status
+  var sessionStatus = selectedSpace === 'Waitlist' ? 'On Waitlist' : 'Active';
+
+  // Append a new row in the Tracker sheet with group details
   trackerSheet.appendRow([
     sessionId,                     // Column A: Session ID
     attendee.uniqueId || '',       // Column B: Unique ID
@@ -567,24 +597,98 @@ function updateCheckInTrackerGroup(trackerSheet, attendee, selectedSpace, select
     attendee.lastName || '',       // Column D: Last Name
     fullName,                      // Column E: Full Name
     isLeader ? attendee.firstName : "", // Column F: Group Leader
-    groupNumber,                   // Column G: Group No.
-    "",                            // Column H: WL Time
+    groupNumber,                   // Column G: Group Number
+    sessionStatus === 'On Waitlist' ? currentTime : '', // Column H: Waitlist Time (only if waitlisted)
     currentTime,                   // Column I: Check-In Time
-    "",                            // Column J: Check-Out Time
-    "",                            // Column K: Waitlist Duration
-    "",                            // Column L: Session Duration
-    "",                            // Column M: Total Duration
+    "",                            // Column J: Check-Out Time (empty at check-in)
+    "",                            // Column K: Waitlist Duration (empty until checked out)
+    "",                            // Column L: Session Duration (empty until checked out)
+    "",                            // Column M: Total Duration (empty until checked out)
     selectedGame,                  // Column N: Game
-    selectedSpace,                 // Column O: VR Space
-    "Active",                      // Column P: Session Status
+    selectedSpace,                 // Column O: VR Space or 'Waitlist'
+    sessionStatus,                 // Column P: Session Status (Active or On Waitlist)
     visitCount,                    // Column Q: Visit Count
-    "",                            // Column R: Notes
-    "",                            // Column S: Error Flag
-    ""                             // Column T: No Show
+    "",                            // Column R: Notes (optional)
+    "",                            // Column S: Error Flag (optional)
+    ""                             // Column T: No Show (optional)
   ]);
 }
 
+/**
+ * Adds the group to the waitlist when no VR spaces are available.
+ * @param {Array} groupMembers - Array of group members.
+ * @param {string} selectedGame - The selected game for the group.
+ * @param {string} sessionId - The session ID for the group leader.
+ * @param {number} groupSize - Number of members in the group.
+ * @param {number} groupNumber - Unique group number.
+ * @param {string} phoneNumber - Group leader's phone number for notifications.
+ */
+function addGroupToWaitlist(groupMembers, selectedGame, sessionId, groupSize, groupNumber, phoneNumber) {
+  var waitlistSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Waitlist');
+  var trackerSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tracker');
+  var checkInTime = new Date();
 
+  // Add group members to the waitlist
+  for (var i = 0; i < groupMembers.length; i++) {
+    var member = groupMembers[i];
+    var rowToAdd = waitlistSheet.getLastRow() + 1;
+    
+    waitlistSheet.getRange(rowToAdd, 1).setValue(sessionId); // Session ID
+    waitlistSheet.getRange(rowToAdd, 2).setValue(member.firstName); // First Name
+    waitlistSheet.getRange(rowToAdd, 3).setValue(member.lastName); // Last Name
+    waitlistSheet.getRange(rowToAdd, 4).setValue(selectedGame); // Game
+    waitlistSheet.getRange(rowToAdd, 5).setValue(groupNumber); // Group Number
+    waitlistSheet.getRange(rowToAdd, 6).setValue(groupSize); // Group Size
+    waitlistSheet.getRange(rowToAdd, 7).setValue(checkInTime); // Check-In Time
+    if (i === 0) {
+      waitlistSheet.getRange(rowToAdd, 8).setValue(phoneNumber); // Phone Number (for group leader)
+    }
+
+    // Also update the tracker
+    updateCheckInTrackerGroup(trackerSheet, member, 'Waitlist', selectedGame, sessionId, member.isLeader, groupNumber);
+  }
+
+  SpreadsheetApp.getUi().alert('Group has been added to the waitlist.');
+}
+
+
+/**
+ * Prompts for the group leader's phone number and asks if the group should be added to the waitlist.
+ * @param {Array} groupMembers - Array of group members.
+ * @param {string} selectedGame - The selected game for the group.
+ * @param {string} sessionId - The session ID for the group leader.
+ * @param {number} groupSize - Number of members in the group.
+ * @param {number} groupNumber - Unique group number.
+ */
+function promptForGroupWaitlist(groupMembers, selectedGame, sessionId, groupSize, groupNumber) {
+  var ui = SpreadsheetApp.getUi();
+  var leader = groupMembers[0]; // Assuming first member is the group leader
+  var phoneNumber = leader.phoneNumber || '';
+
+  // Ask if they want to add the group to the waitlist and confirm the group leader's phone number
+  var promptMessage = 'Would you like to add ' + leader.firstName + ' ' + leader.lastName + '\'s group to the waitlist?\n\n' +
+                      'Phone Number: ' + phoneNumber + '\n\n' +
+                      'Click Yes to confirm, No to enter a new number, or Cancel to cancel.';
+
+  var response = ui.prompt('Add Group to Waitlist', promptMessage, ui.ButtonSet.YES_NO_CANCEL);
+
+  // Handle the response
+  if (response.getSelectedButton() == ui.Button.YES) {
+    // Add to the waitlist with the existing phone number
+    addGroupToWaitlist(groupMembers, selectedGame, sessionId, groupSize, groupNumber, phoneNumber);
+  } else if (response.getSelectedButton() == ui.Button.NO) {
+    // Ask for a new phone number
+    var newPhoneNumberResponse = ui.prompt('Enter New Phone Number', 'Please enter a new phone number for the group leader:', ui.ButtonSet.OK_CANCEL);
+    if (newPhoneNumberResponse.getSelectedButton() == ui.Button.OK) {
+      var newPhoneNumber = newPhoneNumberResponse.getResponseText();
+      if (newPhoneNumber) {
+        addGroupToWaitlist(groupMembers, selectedGame, sessionId, groupSize, groupNumber, newPhoneNumber);
+      } else {
+        ui.alert('Phone number is required to add the group to the waitlist.');
+      }
+    }
+  }
+}
 
 // =========================
 // Update Functions
@@ -694,10 +798,6 @@ function updateVRSpaces(vrSheet, selectedSpace, attendee, selectedGame, sessionI
   }
 }
 
-// =========================
-// Group Check-In Functions
-// =========================
-
 /**
  * Handles the group check-in process.
  * Verifies each group member and assigns VR spaces.
@@ -711,16 +811,33 @@ function proceedGroupCheckIn(selectedGame) {
     scriptProperties.deleteAllProperties(); // Clean up
 
     var groupNumber = generateGroupNumber();
-
     var vrSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VRSpaces');
     var availableSpaces = findAvailableSpacesForGame(selectedGame, vrSheet);
 
+    Logger.log('Available spaces for game ' + selectedGame + ': ' + availableSpaces.length);
+    Logger.log('Group size: ' + groupSize);
+
     if (availableSpaces.length < groupSize) {
-      ui.alert('Not enough VR spaces available for the group.');
+      Logger.log('Not enough VR spaces available for the group.');
+
+      // Trigger waitlist process for the group
+      var confirmWaitlist = ui.alert('Not enough VR spaces available for the group. Would you like to add the group to the waitlist?', ui.ButtonSet.YES_NO);
+      if (confirmWaitlist == ui.Button.YES) {
+        var phoneNumberResponse = ui.prompt('Please enter the group leader\'s phone number:');
+        if (phoneNumberResponse.getSelectedButton() == ui.Button.OK) {
+          var phoneNumber = phoneNumberResponse.getResponseText();
+          if (phoneNumber) {
+            addGroupToWaitlist(groupMembers, selectedGame, generateSessionID(), groupSize, groupNumber, phoneNumber);
+            return;
+          } else {
+            ui.alert('Phone number is required to add the group to the waitlist.');
+          }
+        }
+      }
       return;
     }
 
-    // Prompt to select multiple VR spaces
+    // Proceed with assigning spaces if enough are available
     var template = HtmlService.createTemplateFromFile('GroupVRSpaceSelection');
     template.availableSpaces = availableSpaces;
     template.groupSize = groupSize;
@@ -898,12 +1015,8 @@ function addToWaitlist(attendee, selectedGame, sessionId) {
   }
 
   if (!phoneNumber) return;
-                                                                                                                                  
-                                                                                  
-       
 
   var wlTime = new Date();
-
   var waitlistSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Waitlist');
   waitlistSheet.appendRow([
     sessionId,            // Column A: SessionID
