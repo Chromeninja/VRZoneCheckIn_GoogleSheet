@@ -425,53 +425,85 @@ function groupCheckIn() {
   }
 }
 
-/**
- * Verifies a group member's information based on first and last name.
- * If multiple matches exist, uses the first match and logs an error.
- * @param {string} firstName - The first name of the group member.
- * @param {string} lastName - The last name of the group member.
- * @param {string} role - The role of the group member (e.g., "Group Leader", "Group Member 2").
- * @returns {Object|null} - The attendee object or null if not found/cancelled.
- */
-function verifyGroupMember(firstName, lastName, role) {
-  var ui = SpreadsheetApp.getUi();
-  var matches = getAttendeeInfo(firstName, lastName);
+function getAvailableVRSpaces(vrSheet) {
+  var data = vrSheet.getDataRange().getValues();
+  var availableSpaces = [];
 
-  if (matches.length === 1) {
-    return matches[0];
+  for (var i = 1; i < data.length; i++) { // Assuming the first row is headers
+    var status = data[i][2].toString().trim().toLowerCase(); // Column C: Status
+    var vrSpace = data[i][0].toString().trim(); // Column A: VR Space
+    var attendeeFirstName = data[i][3].toString().trim(); // Column D: FName
+
+    if (status === "available") {
+      availableSpaces.push({
+        space: vrSpace,
+        firstName: attendeeFirstName || "Available"
+      });
+    }
   }
 
-  if (matches.length > 1) {
-    // Use the first match and log an error
-    setErrorFlag(SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tracker'), matches[0].uniqueId, role + ': Multiple matches found. Used first match.');
-    return matches[0];
-		
-  }
-
-  ui.alert('No attendee found with that first and last name for ' + role + '.');
-  return null;
+  return availableSpaces;
 }
 
-/**
- * Handles the game selection for the group from the HTML dialog.
- * @param {string} selectedGame - The game selected by the user for the group.
- */
-function selectGameGroup(selectedGame) {
-  var scriptProperties = PropertiesService.getScriptProperties();
-  var groupMembersJSON = scriptProperties.getProperty('groupMembers');
-  var groupMembers = JSON.parse(groupMembersJSON);
-  var groupSize = groupMembers.length;
-  var groupNumber = generateGroupNumber();
-    var vrSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VRSpaces');
-  var availableSpaces = findAvailableSpacesForGame(selectedGame, vrSheet);
+function verifyAttendee(firstName, lastName) {
+  var legalSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Legal'); // Replace with your actual sheet name
+  var data = legalSheet.getDataRange().getValues();
 
-  if (availableSpaces.length < groupSize) {
-    // Not enough spaces for the entire group
-    SpreadsheetApp.getUi().alert('Not enough VR spaces available for the group.');
+  for (var i = 1; i < data.length; i++) { // Assuming the first row is headers
+    var legalFirstName = data[i][0].toString().trim().toLowerCase(); // Column A: First Name
+    var legalLastName = data[i][1].toString().trim().toLowerCase(); // Column B: Last Name
+
+    if (legalFirstName === firstName.toLowerCase() && legalLastName === lastName.toLowerCase()) {
+      return true; // Valid attendee
+    }
+  }
+
+  return false; // Attendee not found or invalid
+}
+function checkDuplicateFirstName(firstName) {
+  var legalSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Legal'); // Replace with your actual sheet name
+  var data = legalSheet.getDataRange().getValues();
+  var count = 0;
+
+  for (var i = 1; i < data.length; i++) { // Assuming the first row is headers
+    var legalFirstName = data[i][0].toString().trim().toLowerCase(); // Column A: First Name
+
+    if (legalFirstName === firstName.toLowerCase()) {
+      count++;
+      if (count > 1) {
+        return true; // Duplicate first name found
+      }
+    }
+  }
+
+  return false; // No duplicates
+}
+
+
+function proceedGroupCheckIn(selectedGame) {
+  var ui = SpreadsheetApp.getUi();
+  try {
+    var vrSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VRSpaces');
+    var trackerSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tracker');
+
+    // Retrieve group information from script properties
+    var scriptProperties = PropertiesService.getScriptProperties();
+    var groupSize = parseInt(scriptProperties.getProperty('groupSize'));
+    var groupLeaderFirstName = scriptProperties.getProperty('groupLeaderFirstName');
+    var groupLeaderLastName = scriptProperties.getProperty('groupLeaderLastName');
+    var groupMembers = JSON.parse(scriptProperties.getProperty('groupMembers'));
+    scriptProperties.deleteAllProperties(); // Clean up
+
+    var groupNumber = new Date().getTime(); // Unique group identifier
+
+    var availableSpaces = getAvailableVRSpaces(vrSheet);
+
+    if (availableSpaces.length < groupSize) {
+      ui.alert('Not enough VR spaces available for the group.');
       return;
     }
 
-  // Prompt to select multiple VR spaces for the group
+    // Prompt to select multiple VR spaces
     var template = HtmlService.createTemplateFromFile('GroupVRSpaceSelection');
     template.availableSpaces = availableSpaces;
     template.groupSize = groupSize;
@@ -481,69 +513,12 @@ function selectGameGroup(selectedGame) {
 
     var htmlOutput = template.evaluate().setWidth(400).setHeight(300);
     SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Assign VR Spaces to Group');
-}
-
-/**
- * Generates a unique group number based on the current timestamp.
- * @returns {number} - The generated group number.
- */
-function generateGroupNumber() {
-  return new Date().getTime(); // Unique group identifier
-}
-
-/**
- * Assigns VR spaces to the group members based on selected spaces.
- * @param {Array} selectedSpaces - Array of selected VR space names.
- * @param {string} selectedGame - The selected game for the group.
- * @param {number} groupNumber - The unique group number.
- * @param {string} groupMembersJSON - JSON string of group members.
- */
-function assignVRSpacesToGroup(selectedSpaces, selectedGame, groupNumber, groupMembersJSON) {
-  try {
-    var vrSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VRSpaces');
-    var trackerSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tracker');
-
-    var groupMembers = JSON.parse(groupMembersJSON);
-    var checkInTime = new Date();
-
-    if (selectedSpaces.length < groupMembers.length) {
-      SpreadsheetApp.getUi().alert('Number of selected VR spaces is less than the number of group members.');
-      return;
-    }
-
-    // Ensure no duplicate VR spaces are assigned
-    var uniqueSpaces = new Set(selectedSpaces);
-    if (uniqueSpaces.size !== selectedSpaces.length) {
-      SpreadsheetApp.getUi().alert('Duplicate VR spaces selected. Please assign unique VR spaces to each group member.');
-      return;
-    }
-
-    for (var i = 0; i < groupMembers.length; i++) {
-      var attendee = groupMembers[i];
-      var sessionId = generateSessionID(attendee.uniqueId || '');
-
-      var selectedSpace = selectedSpaces[i];
-      updateCheckInTrackerGroup(trackerSheet, attendee, selectedSpace, selectedGame, sessionId, attendee.isLeader, groupNumber);
-      updateVRSpaces(vrSheet, selectedSpace, attendee, selectedGame, sessionId);
-    }
-
-    SpreadsheetApp.getUi().alert('Group check-in completed successfully.');
-
   } catch (error) {
     SpreadsheetApp.getUi().alert('An error occurred during group check-in: ' + error.message);
   }
 }
 
-/**
- * Updates the Tracker sheet for group check-in.
- * @param {Sheet} trackerSheet - The Tracker sheet.
- * @param {Object} attendee - The attendee object.
- * @param {string} selectedSpace - The assigned VR space.
- * @param {string} selectedGame - The selected game.
- * @param {string} sessionId - The session ID.
- * @param {boolean} isLeader - Indicates if the attendee is the group leader.
- * @param {number} groupNumber - The unique group number.
- */
+
 function updateCheckInTrackerGroup(trackerSheet, attendee, selectedSpace, selectedGame, sessionId, isLeader, groupNumber) {
   var fullName = attendee.firstName + ' ' + (attendee.lastName || '');
   var currentTime = new Date();
@@ -691,47 +666,6 @@ function updateVRSpaces(vrSheet, selectedSpace, attendee, selectedGame, sessionI
     // Column H: Duration remains untouched
   } else {
     throw new Error("VR Space not found: " + selectedSpace);
-  }
-}
-
-// =========================
-// Group Check-In Functions
-// =========================
-
-/**
- * Handles the group check-in process.
- * Verifies each group member and assigns VR spaces.
- */
-function proceedGroupCheckIn(selectedGame) {
-  var ui = SpreadsheetApp.getUi();
-  try {
-    var scriptProperties = PropertiesService.getScriptProperties();
-    var groupSize = parseInt(scriptProperties.getProperty('groupSize'));
-    var groupMembers = JSON.parse(scriptProperties.getProperty('groupMembers'));
-    scriptProperties.deleteAllProperties(); // Clean up
-
-    var groupNumber = generateGroupNumber();
-
-    var vrSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VRSpaces');
-    var availableSpaces = findAvailableSpacesForGame(selectedGame, vrSheet);
-
-    if (availableSpaces.length < groupSize) {
-      ui.alert('Not enough VR spaces available for the group.');
-      return;
-    }
-
-    // Prompt to select multiple VR spaces
-    var template = HtmlService.createTemplateFromFile('GroupVRSpaceSelection');
-    template.availableSpaces = availableSpaces;
-    template.groupSize = groupSize;
-    template.groupMembers = JSON.stringify(groupMembers);
-    template.selectedGame = selectedGame;
-    template.groupNumber = groupNumber;
-
-    var htmlOutput = template.evaluate().setWidth(400).setHeight(300);
-    SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Assign VR Spaces to Group');
-  } catch (error) {
-    ui.alert('An error occurred during group check-in: ' + error.message);
   }
 }
 
@@ -1200,6 +1134,45 @@ function processMarkAsNoShow(selectedSessionId) {
   removeFromWaitlist(waitlistSheet, selectedSessionId);
 
   ui.alert('Attendee has been marked as No Show and removed from the waitlist.');
+}
+
+// =========================
+// Helper Functions
+// =========================
+
+/**
+ * Retrieves and verifies group members' information.
+ * @param {string} firstName - The first name of the group member.
+ * @param {string} lastName - The last name of the group member.
+ * @param {string} role - The role of the group member (e.g., "Group Leader", "Group Member 2").
+ * @returns {Object|null} - The attendee object or null if not found/cancelled.
+ */
+function verifyGroupMember(firstName, lastName, role) {
+  var ui = SpreadsheetApp.getUi();
+  var matches = getAttendeeInfo(firstName, lastName);
+
+  if (matches.length === 1) {
+    return matches[0];
+  }
+
+  if (matches.length > 1) {
+    // Use the first match and log an error
+    setErrorFlag(SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tracker'), matches[0].uniqueId, role + ': Multiple matches found. Used first match.');
+    return matches[0];
+  }
+
+  ui.alert('No attendee found with that first and last name for ' + role + '.');
+  return null;
+}
+
+/**
+ * Capitalizes the first letter of a string.
+ * @param {string} str - The string to capitalize.
+ * @returns {string} - The capitalized string.
+ */
+function capitalize(str) {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 // =========================
