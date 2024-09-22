@@ -1,33 +1,67 @@
-<!-- GroupVRSpaceSelection.html -->
+<!-- File Name: GroupVRSpaceSelection.html -->
 <!DOCTYPE html>
 <html>
+  <head>
+    <base target="_top">
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+      .vr-space-selection {
+        margin-bottom: 15px;
+      }
+      .submit-button {
+        margin-top: 20px;
+      }
+      select {
+        width: 100%;
+        padding: 8px;
+        box-sizing: border-box;
+      }
+    </style>
+  </head>
   <body>
-    <form id="groupVRSpaceForm">
-      <label for="vrSpaceSelect">Select VR Spaces for the Group:</label><br><br>
-      <select id="vrSpaceSelect" multiple size="10" style="width: 100%;">
-        <? var spaces = availableSpaces; ?>
-        <? for (var i = 0; i < spaces.length; i++) { ?>
-          <option value="<?= spaces[i].space ?>"><?= spaces[i].space ?> - <?= spaces[i].firstName ?></option>
-        <? } ?>
-      </select><br><br>
-      <input type="submit" value="Assign VR Spaces">
+    <form id="vrSpaceForm">
+      <? for (var i = 0; i < groupSize; i++) { ?>
+        <div class="vr-space-selection">
+          <label for="space<?= i ?>">Player <?= i + 1 ?>:</label>
+          <select name="vrSpace<?= i ?>" id="space<?= i ?>">
+            <option value="">-- Select VR Space --</option>
+            <? for (var j = 0; j < availableSpaces.length; j++) { ?>
+              <option value="<?= availableSpaces[j] ?>"><?= availableSpaces[j] ?></option>
+            <? } ?>
+          </select>
+        </div>
+      <? } ?>
+      <button type="button" class="submit-button" onclick="submitSelection()">Assign VR Spaces</button>
     </form>
-    <script>
-      var selectedGame = '<?= selectedGame ?>';
-      var groupNumber = '<?= groupNumber ?>';
-      var groupMembersJSON = '<?= groupMembers ?>';
 
-      document.getElementById('groupVRSpaceForm').addEventListener('submit', function(event) {
-        event.preventDefault();
-        var selectedOptions = document.getElementById('vrSpaceSelect').selectedOptions;
+    <script>
+      function submitSelection() {
         var selectedSpaces = [];
-        for (var i = 0; i < selectedOptions.length; i++) {
-          selectedSpaces.push(selectedOptions[i].value);
+        var groupSize = <?= groupSize ?>;
+
+        for (var i = 0; i < groupSize; i++) {
+          var space = document.getElementById('space' + i).value;
+          if (!space) {
+            alert('Please select a VR space for all group members.');
+            return;
+          }
+          selectedSpaces.push(space);
         }
+
+        // Check for duplicate selections
+        var uniqueSpaces = new Set(selectedSpaces);
+        if (uniqueSpaces.size !== selectedSpaces.length) {
+          alert('Please select unique VR spaces for each group member.');
+          return;
+        }
+
         google.script.run.withSuccessHandler(function() {
           google.script.host.close();
-        }).assignVRSpacesToGroup(selectedSpaces, selectedGame, groupNumber, groupMembersJSON);
-      });
+        }).assignVRSpacesToGroup(selectedSpaces, '<?= selectedGame ?>', <?= groupNumber ?>, '<?= groupMembers ?>');
+      }
     </script>
   </body>
 </html>
