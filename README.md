@@ -38,10 +38,12 @@ The repository contains the following files and folders:
     |-- Project-Overview.md
     |-- System-Structure.md
 |-- LICENSE
+```
+
 
 #Breakdown of Key Files:
 
----
+
 
 ## Google Sheets Structure
 
