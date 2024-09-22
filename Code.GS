@@ -43,7 +43,6 @@ function getAttendeeInfo(firstName, lastName = null) {
 
   firstName = firstName.toLowerCase();
   if (lastName) lastName = lastName.toLowerCase();
-   
 
   for (var i = 1; i < data.length; i++) { // Assuming the first row is headers
     var sheetFirstName = data[i][3]; // Adjust column index based on your sheet
@@ -138,17 +137,14 @@ function findAvailableSpacesForGame(selectedGame, vrSheet) {
   for (var i = 1; i < data.length; i++) { // Assuming row 1 contains headers
     var status = data[i][2]; // Column C: VR Space Status (Available/Occupied)
     var supportedGames = data[i][1]; // Column B: Supported Games
-    
-    Logger.log('Checking row ' + i + ' - Status: ' + status + ', Supported Games: ' + supportedGames);
 
     // Check if the space is available and supports the selected game
     if (status === 'Available' && supportedGames.includes(selectedGame)) {
-      Logger.log('Space available for game ' + selectedGame + ' in row ' + i);
+      
       availableSpaces.push(data[i][0]); // Assuming VR space name is in Column A
     }
   }
 
-  Logger.log('Available spaces for game ' + selectedGame + ': ' + availableSpaces.length);
   return availableSpaces;
 }
 
@@ -229,7 +225,6 @@ function getIndividualAttendeeInfo() {
 
     matches = getAttendeeInfo(firstName, lastName);
     if (matches.length === 1) {
-      // Log warning if multiple matches existed and user proceeded with first match
       if (matches.length > 1) {
         setErrorFlag(SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tracker'), matches[0].uniqueId, 'Multiple matches found. Used first match.');
       }
@@ -327,6 +322,7 @@ function selectVRSpace(selectedSpace, attendeeDataJSON, selectedGame, sessionId)
   var vrSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VRSpaces');
   var trackerSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tracker');
   try {
+    // The attendee is checked in, not waitlisted
     updateCheckInTracker(trackerSheet, attendee, selectedSpace, selectedGame, sessionId, false);
     updateVRSpaces(vrSheet, selectedSpace, attendee, selectedGame, sessionId);
     SpreadsheetApp.getUi().alert('Attendee checked in to ' + selectedSpace + ' with game ' + selectedGame + '.');
@@ -467,13 +463,9 @@ function selectGameGroup(selectedGame) {
   var vrSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VRSpaces');
   var availableSpaces = findAvailableSpacesForGame(selectedGame, vrSheet);
 
-  // Log the number of available spaces and group size for debugging
-  Logger.log('Available spaces: ' + availableSpaces.length);
-  Logger.log('Group size: ' + groupSize);
-
   if (availableSpaces.length < groupSize) {
     // Not enough spaces for the entire group
-    Logger.log('Not enough VR spaces available for the group.');
+    
     SpreadsheetApp.getUi().alert('Not enough VR spaces available for the group.');
     return;
   }
@@ -528,15 +520,9 @@ function assignVRSpacesToGroup(selectedSpaces, selectedGame, groupNumber, groupM
     var groupMembers = JSON.parse(groupMembersJSON);
     var checkInTime = new Date();
 
-    Logger.log('Group members JSON: ' + groupMembersJSON);
-    Logger.log('Selected spaces: ' + JSON.stringify(selectedSpaces));
-
-    // Log the length of both arrays
-    Logger.log('Number of selected spaces: ' + selectedSpaces.length);
-
     // Ensure selectedSpaces length matches groupMembers length
     if (selectedSpaces.length !== groupMembers.length) {
-      Logger.log('Error: Number of selected VR spaces does not match the number of group members.');
+      
       SpreadsheetApp.getUi().alert('Error: The number of selected VR spaces does not match the number of group members.');
       return;
     }
@@ -545,18 +531,13 @@ function assignVRSpacesToGroup(selectedSpaces, selectedGame, groupNumber, groupM
       var attendee = groupMembers[i];
       var selectedSpace = selectedSpaces[i];
       var isLeader = (i === 0); // Assume the first member is the group leader
-      
-      Logger.log('Assigning VR space: ' + selectedSpace + ' to attendee: ' + attendee.firstName);
 
       if (!attendee || !attendee.firstName) {
-        Logger.log('Error: Attendee or firstName is undefined at index ' + i);
+        
         continue;
       }
 
       var sessionId = generateSessionID(attendee.uniqueId || '');
-
-      // Log the tracker data before updating
-      Logger.log('Updating tracker for attendee: ' + attendee.firstName);
 
       // Update the Tracker sheet and VR spaces
       updateCheckInTrackerGroup(trackerSheet, attendee, selectedSpace, selectedGame, sessionId, isLeader, groupNumber, groupMembers[0]); // Pass group leader
@@ -566,11 +547,10 @@ function assignVRSpacesToGroup(selectedSpaces, selectedGame, groupNumber, groupM
     SpreadsheetApp.getUi().alert('Group check-in completed successfully.');
 
   } catch (error) {
-    Logger.log('Error during group check-in: ' + error.message);
+    
     SpreadsheetApp.getUi().alert('An error occurred during group check-in: ' + error.message);
   }
 }
-
 
 /**
  * Updates the Tracker sheet for group check-in and waitlist.
@@ -585,24 +565,20 @@ function assignVRSpacesToGroup(selectedSpaces, selectedGame, groupNumber, groupM
  */
 function updateCheckInTrackerGroup(trackerSheet, attendee, selectedSpace, selectedGame, sessionId, isLeader, groupNumber, groupLeader) {
   var fullName = attendee.firstName + ' ' + (attendee.lastName || '');
+  var groupLeaderFullName = groupLeader.firstName + ' ' + groupLeader.lastName; // Group leader's full name
   var currentTime = new Date();
-
-  // Log the attendee and group leader objects before using them
-  Logger.log('Attendee Object: ' + JSON.stringify(attendee));
-  Logger.log('Group Leader Object: ' + JSON.stringify(groupLeader));
+  var lastRow = trackerSheet.getLastRow() + 1;
 
   // If either attendee or groupLeader is undefined, log an error and return early
   if (!attendee || !attendee.firstName) {
-    Logger.log('Error: Attendee or attendee.firstName is undefined.');
+    
     return;
   }
 
   if (!groupLeader || !groupLeader.firstName) {
-    Logger.log('Error: Group Leader or groupLeader.firstName is undefined.');
+    
     return;
   }
-
-  Logger.log('Starting to update tracker for attendee: ' + attendee.firstName + ' ' + attendee.lastName);
 
   // Calculate Visit Count
   var data = trackerSheet.getDataRange().getValues();
@@ -617,42 +593,36 @@ function updateCheckInTrackerGroup(trackerSheet, attendee, selectedSpace, select
   }
 
   // Determine session status
-  var sessionStatus = selectedSpace === 'Waitlist' ? 'On Waitlist' : 'Active';
+  var isWaitlisted = selectedSpace === 'Waitlist';
+  var sessionStatus = isWaitlisted ? 'Waiting' : 'Active';
+  var waitlistTime = isWaitlisted ? currentTime : '';
+  var checkInTime = !isWaitlisted ? currentTime : '';
 
-  // Log Waitlist Time or Check-In Time based on session status
-  var waitlistTime = sessionStatus === 'On Waitlist' ? currentTime : '';
-  var checkInTime = sessionStatus === 'Active' ? currentTime : '';
-
-  Logger.log('Session Status: ' + sessionStatus);
-  Logger.log('Appending row to tracker sheet: ' + trackerSheet.getName());
-
-  // Append a new row in the Tracker sheet with group details
+  // Append a new row in the Tracker sheet with individual details and use formulas for durations
   trackerSheet.appendRow([
-    sessionId,                      // Column A: Session ID
-    attendee.uniqueId || '',        // Column B: Unique ID
-    attendee.firstName,             // Column C: First Name
-    attendee.lastName || '',        // Column D: Last Name
-    fullName,                       // Column E: Full Name
-    groupLeader.firstName + ' ' + groupLeader.lastName, // Column F: Group Leader Name
-    groupNumber,                    // Column G: Group Number
-    waitlistTime,                   // Column H: Waitlist Time (only if waitlisted)
-    checkInTime,                    // Column I: Check-In Time (only if actively checked in)
-    "",                             // Column J: Check-Out Time (empty at check-in)
-    "",                             // Column K: Waitlist Duration (empty until checked out)
-    "",                             // Column L: Session Duration (empty until checked out)
-    "",                             // Column M: Total Duration (empty until checked out)
-    selectedGame,                   // Column N: Game
-    selectedSpace,                  // Column O: VR Space or 'Waitlist'
-    sessionStatus,                  // Column P: Session Status (Active or On Waitlist)
-    visitCount,                     // Column Q: Visit Count
-    "",                             // Column R: Notes (optional)
-    "",                             // Column S: Error Flag (optional)
-    ""                              // Column T: No Show (optional)
+    sessionId,                        // Column A: Session ID
+    attendee.uniqueId || '',          // Column B: Unique ID
+    attendee.firstName,               // Column C: First Name
+    attendee.lastName || '',          // Column D: Last Name
+    fullName,                         // Column E: Full Name
+    groupLeaderFullName,              // Column F: Group Leader (Always filled with the group leader’s name)
+    groupNumber || '',                // Column G: Group Number (for group check-ins)
+    waitlistTime,                     // Column H: Waitlist Time (if waitlisted)
+    checkInTime,                      // Column I: Check-In Time (if not waitlisted)
+    "",                               // Column J: Check-Out Time (empty at check-in)
+    '=IF(H' + lastRow + '="","N/A",NOW()-H' + lastRow + ')', // Column K: Waitlist Duration Formula
+    '=IF(I' + lastRow + '="","N/A",NOW()-I' + lastRow + ')', // Column L: Session Duration Formula
+    '=IF(K' + lastRow + '="N/A", L' + lastRow + ', K' + lastRow + ')', // Column M: Total Duration Formula
+    selectedGame,                     // Column N: Game
+    selectedSpace,                    // Column O: VR Space or 'Waitlist'
+    sessionStatus,                    // Column P: Session Status (Active or Waiting)
+    visitCount,                       // Column Q: Visit Count
+    "",                               // Column R: Notes (optional)
+    "",                               // Column S: Error Flag (optional)
+    ""                                // Column T: No Show (optional)
   ]);
 
-  Logger.log('Row appended successfully to tracker.');
 }
-
 
 /**
  * Adds the group to the waitlist when no VR spaces are available.
@@ -696,7 +666,6 @@ function addGroupToWaitlist(groupMembers, selectedGame, sessionIdPrefix, groupSi
 
   SpreadsheetApp.getUi().alert('Group has been added to the waitlist.');
 }
-
 
 /**
  * Prompts for the group leader's phone number and asks if the group should be added to the waitlist.
@@ -776,6 +745,17 @@ function updateCheckInTracker(trackerSheet, attendee, selectedSpace, selectedGam
     var visitCount = previousVisitCount ? parseInt(previousVisitCount) + 1 : 1;
     trackerSheet.getRange(trackerRowToUpdate, 17).setValue(visitCount);
 
+    // Add duration formulas if they're not present
+    if (!data[trackerRowToUpdate - 1][10]) {
+      trackerSheet.getRange(trackerRowToUpdate, 11).setFormula('=IF(H' + trackerRowToUpdate + '="","N/A",NOW()-H' + trackerRowToUpdate + ')'); // Waitlist Duration
+    }
+    if (!data[trackerRowToUpdate - 1][11]) {
+      trackerSheet.getRange(trackerRowToUpdate, 12).setFormula('=IF(I' + trackerRowToUpdate + '="","N/A",NOW()-I' + trackerRowToUpdate + ')'); // Session Duration
+    }
+    if (!data[trackerRowToUpdate - 1][12]) {
+      trackerSheet.getRange(trackerRowToUpdate, 13).setFormula('=IF(K' + trackerRowToUpdate + '="N/A", L' + trackerRowToUpdate + ', K' + trackerRowToUpdate + ')'); // Total Duration
+    }
+
   } else {
     // Calculate Visit Count
     var visitCount = 1;
@@ -799,12 +779,12 @@ function updateCheckInTracker(trackerSheet, attendee, selectedSpace, selectedGam
       isFromWaitlist ? currentTime : "", // WL Time
       isFromWaitlist ? "" : currentTime, // Check-In Time
       "", // Check-Out Time
-      "", // Waitlist Duration
-      "", // Session Duration
-      "", // Total Duration
+      '=IF(H' + (trackerSheet.getLastRow() + 1) + '="","N/A",NOW()-H' + (trackerSheet.getLastRow() + 1) + ')', // Waitlist Duration
+      '=IF(I' + (trackerSheet.getLastRow() + 1) + '="","N/A",NOW()-I' + (trackerSheet.getLastRow() + 1) + ')', // Session Duration
+      '=IF(K' + (trackerSheet.getLastRow() + 1) + '="N/A", L' + (trackerSheet.getLastRow() + 1) + ', K' + (trackerSheet.getLastRow() + 1) + ')', // Total Duration
       selectedGame,
       selectedSpace,
-      isFromWaitlist ? "Waiting" : "Active",
+      isFromWaitlist ? "" : "Active",
       visitCount,
       "", // Notes
       "", // Error Flag
@@ -862,11 +842,7 @@ function proceedGroupCheckIn(selectedGame) {
     var vrSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VRSpaces');
     var availableSpaces = findAvailableSpacesForGame(selectedGame, vrSheet);
 
-    Logger.log('Available spaces for game ' + selectedGame + ': ' + availableSpaces.length);
-    Logger.log('Group size: ' + groupSize);
-
     if (availableSpaces.length < groupSize) {
-      Logger.log('Not enough VR spaces available for the group.');
 
       // Trigger waitlist process for the group
       var confirmWaitlist = ui.alert('Not enough VR spaces available for the group. Would you like to add the group to the waitlist?', ui.ButtonSet.YES_NO);
@@ -901,7 +877,7 @@ function proceedGroupCheckIn(selectedGame) {
 }
 
 // =========================
-// Check-Out Functions
+// Individual Check-Out Functions
 // =========================
 
 /**
@@ -973,7 +949,6 @@ function processCheckOut(selectedSpaces) {
  * @param {string} space - The VR space being checked out.
  * @param {Date} checkOutTime - The check-out time.
  */
-
 function updateCheckOutTracker(trackerSheet, space, checkOutTime) {
   var data = trackerSheet.getDataRange().getValues();
   var rowToUpdate = -1;
@@ -991,26 +966,10 @@ function updateCheckOutTracker(trackerSheet, space, checkOutTime) {
 
   trackerSheet.getRange(rowToUpdate, 10).setValue(checkOutTime); // Column J: Check-Out Time
 
-  var checkInTime = data[rowToUpdate - 1][8];
-  var wlTime = data[rowToUpdate - 1][7];
-
-  if (checkInTime instanceof Date) {
-    var sessionDuration = (checkOutTime - checkInTime) / (1000 * 60); // Duration in minutes
-    trackerSheet.getRange(rowToUpdate, 12).setValue(sessionDuration); // Column L: Session Duration
-  } else {
-    trackerSheet.getRange(rowToUpdate, 19).setValue(true); // Column S: Error Flag
-    trackerSheet.getRange(rowToUpdate, 18).setValue('Invalid Check-In Time'); // Column R: Notes
-  }
-
-  if (wlTime instanceof Date) {
-    var waitlistDuration = (checkInTime - wlTime) / (1000 * 60); // Duration in minutes
-    trackerSheet.getRange(rowToUpdate, 11).setValue(waitlistDuration); // Column K: Waitlist Duration
-
-    var totalDuration = (checkOutTime - wlTime) / (1000 * 60); // Duration in minutes
-    trackerSheet.getRange(rowToUpdate, 13).setValue(totalDuration); // Column M: Total Duration
-  } else {
-    trackerSheet.getRange(rowToUpdate, 13).setValue(sessionDuration); // Column M: Total Duration
-  }
+  // Add formulas for Waitlist Duration, Session Duration, and Total Duration
+  trackerSheet.getRange(rowToUpdate, 11).setFormula('=IF(H' + rowToUpdate + '="","N/A",NOW()-H' + rowToUpdate + ')'); // Column K: Waitlist Duration
+  trackerSheet.getRange(rowToUpdate, 12).setFormula('=IF(I' + rowToUpdate + '="","N/A",NOW()-I' + rowToUpdate + ')'); // Column L: Session Duration
+  trackerSheet.getRange(rowToUpdate, 13).setFormula('=IF(K' + rowToUpdate + '="N/A", L' + rowToUpdate + ', K' + rowToUpdate + ')'); // Column M: Total Duration
 
   trackerSheet.getRange(rowToUpdate, 16).setValue("Completed"); // Column P: Session Status
 }
@@ -1065,18 +1024,19 @@ function addToWaitlist(attendee, selectedGame, sessionId) {
   var wlTime = new Date();
   var waitlistSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Waitlist');
   waitlistSheet.appendRow([
-    sessionId,                     // Column A: SessionID
-    '',                            // Column B: Group Number (Empty for individual)
-    '',                            // Column C: Group Leader (Empty for individual)
-    attendee.firstName,            // Column D: FName
-    phoneNumber,                   // Column E: Phone Number
-    selectedGame,                  // Column F: Game
-    wlTime,                        // Column G: WL Time
-    '',                            // Column H: Time Notified (initially empty)
+    sessionId,                      // Column A: Session ID
+    '',                             // Column B: Group Number (Empty for individual)
+    '',                             // Column C: Group Leader (Empty for individual)
+    attendee.firstName,             // Column D: FName
+    phoneNumber,                    // Column E: Phone Number
+    selectedGame,                   // Column F: Game
+    wlTime,                         // Column G: WL Time
+    '',                             // Column H: Time Notified (initially empty)
     '=NOW()-G' + (waitlistSheet.getLastRow() + 1), // Column I: Time Since Added
-    ''                             // Column J: Time Since Notified (initially empty)
+    ''                              // Column J: Time Since Notified (initially empty)
   ]);
 
+  // Update tracker sheet with formulas for durations
   var trackerSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tracker');
   updateCheckInTracker(trackerSheet, attendee, "", selectedGame, sessionId, true);
 
@@ -1298,10 +1258,10 @@ function processMarkAsNotified(selectedSessionId) {
 function markAsNoShow() {
   var trackerSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tracker');
   var data = trackerSheet.getDataRange().getValues();
-  var waitingAttendees = [];
+  var Attendees = [];
 
   for (var i = 1; i < data.length; i++) { // Assuming the first row is headers
-    if (data[i][15].toString().trim().toLowerCase() === "waiting") { // Column P: Session Status
+    if (data[i][15].toString().trim().toLowerCase() === "") { // Column P: Session Status
       waitingAttendees.push({
         sessionId: data[i][0].toString().trim(),     // Column A: Session ID
         firstName: data[i][2].toString().trim(),     // Column C: First Name
