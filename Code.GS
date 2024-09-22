@@ -1049,7 +1049,6 @@ function addToWaitlist(attendee, selectedGame, sessionId) {
   var promptMessage = phoneNumber
     ? 'Would you like to add ' + attendee.firstName + ' ' + attendee.lastName + ' to the waitlist?\n\nPhone Number: ' + phoneNumber + '\n\nClick Yes to confirm, No to enter a new number, or Cancel to cancel.'
     : 'Would you like to add ' + attendee.firstName + ' ' + attendee.lastName + ' to the waitlist?\n\nNo phone number found.\n\nClick Yes to enter a phone number, or Cancel to cancel.';
-       
 
   var response = ui.alert('Add to Waitlist', promptMessage, ui.ButtonSet.YES_NO_CANCEL);
 
@@ -1063,23 +1062,19 @@ function addToWaitlist(attendee, selectedGame, sessionId) {
   }
 
   if (!phoneNumber) return;
-                                                                                                                                  
-                                                                                  
-       
-
   var wlTime = new Date();
-
   var waitlistSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Waitlist');
   waitlistSheet.appendRow([
-    sessionId,            // Column A: SessionID
-    attendee.firstName,   // Column B: FName
-    phoneNumber,          // Column C: Phone Number
-    selectedGame,         // Column D: Game
-    wlTime,               // Column E: WL Time
-    "",                   // Column F: Time Notified
-    "",                   // Column G: Time Since Added
-    "",                   // Column H: Time Since Notified
-    ""                    // Column I: Group No.
+    sessionId,                     // Column A: SessionID
+    '',                            // Column B: Group Number (Empty for individual)
+    '',                            // Column C: Group Leader (Empty for individual)
+    attendee.firstName,            // Column D: FName
+    phoneNumber,                   // Column E: Phone Number
+    selectedGame,                  // Column F: Game
+    wlTime,                        // Column G: WL Time
+    '',                            // Column H: Time Notified (initially empty)
+    '=NOW()-G' + (waitlistSheet.getLastRow() + 1), // Column I: Time Since Added
+    ''                             // Column J: Time Since Notified (initially empty)
   ]);
 
   var trackerSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tracker');
@@ -1088,11 +1083,12 @@ function addToWaitlist(attendee, selectedGame, sessionId) {
   ui.alert('Attendee ' + attendee.firstName + ' ' + attendee.lastName + ' has been successfully added to the waitlist.');
 }
 
-  /**
-   * Prompts the user to enter a phone number.
+/**
+ * Prompts the user to enter a phone number.
    * @param {UI} ui - The Spreadsheet UI instance.
    * @returns {string|null} - The entered phone number or null if cancelled.
    */
+
 function promptForPhoneNumber(ui) {
   var phoneResponse = ui.prompt('Enter Phone Number', 'Please enter the attendee\'s phone number:', ui.ButtonSet.OK_CANCEL);
   if (phoneResponse.getSelectedButton() == ui.Button.OK) {
@@ -1150,10 +1146,10 @@ function processMoveFromWaitlist(selectedSessionId) {
     if (waitlistData[i][0].toString().trim() === selectedSessionId) { // Column A: SessionID
       selectedEntry = {
         sessionId: waitlistData[i][0],       // Column A: SessionID
-        firstName: waitlistData[i][1],       // Column B: FName
-        phoneNumber: waitlistData[i][2],     // Column C: Phone Number
-        game: waitlistData[i][3],            // Column D: Game
-        wlTime: waitlistData[i][4],          // Column E: WL Time
+        firstName: waitlistData[i][3],       // Column D: FName
+        phoneNumber: waitlistData[i][4],     // Column E: Phone Number
+        game: waitlistData[i][5],            // Column F: Game
+        wlTime: waitlistData[i][6],          // Column G: WL Time
         rowIndex: i + 1
       };
       break;
@@ -1190,13 +1186,6 @@ function processMoveFromWaitlist(selectedSessionId) {
   SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Assign VR Space');
 }
 
-/**
- * Finalizes the move of an attendee from the waitlist to a VR space.
- * @param {string} selectedSpace - The selected VR space.
- * @param {string} attendeeDataJSON - JSON string of attendee data.
- * @param {string} selectedGame - The selected game.
- * @param {string} sessionId - The session ID.
- */
 function finalizeMoveFromWaitlist(selectedSpace, attendeeDataJSON, selectedGame, sessionId) {
   var attendee = JSON.parse(attendeeDataJSON);
 
@@ -1205,11 +1194,11 @@ function finalizeMoveFromWaitlist(selectedSpace, attendeeDataJSON, selectedGame,
   var waitlistSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Waitlist');
 
   try {
-  updateCheckInTracker(trackerSheet, attendee, selectedSpace, selectedGame, sessionId, false);
-  updateVRSpaces(vrSheet, selectedSpace, attendee, selectedGame, sessionId);
-  removeFromWaitlist(waitlistSheet, sessionId);
+    updateCheckInTracker(trackerSheet, attendee, selectedSpace, selectedGame, sessionId, false);
+    updateVRSpaces(vrSheet, selectedSpace, attendee, selectedGame, sessionId);
+    removeFromWaitlist(waitlistSheet, sessionId);
 
-  SpreadsheetApp.getUi().alert('Attendee assigned to ' + selectedSpace + ' with game ' + selectedGame + '.');
+    SpreadsheetApp.getUi().alert('Attendee assigned to ' + selectedSpace + ' with game ' + selectedGame + '.');
   } catch (error) {
     SpreadsheetApp.getUi().alert('An error occurred while assigning VR space: ' + error.message);
   }
@@ -1282,7 +1271,6 @@ function markAsNotified() {
  * Processes marking an attendee as notified.
  * @param {string} selectedSessionId - The session ID of the attendee to mark as notified.
  */
-
 function processMarkAsNotified(selectedSessionId) {
   var ui = SpreadsheetApp.getUi();
   var waitlistSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Waitlist');
@@ -1290,7 +1278,8 @@ function processMarkAsNotified(selectedSessionId) {
 
   for (var i = 1; i < data.length; i++) {
     if (data[i][0].toString().trim() === selectedSessionId) { // Column A: SessionID
-      waitlistSheet.getRange(i + 1, 6).setValue(new Date()); // Column F: Time Notified
+      waitlistSheet.getRange(i + 1, 8).setValue(new Date()); // Column H: Time Notified
+      waitlistSheet.getRange(i + 1, 10).setFormula('=NOW()-H' + (i + 1)); // Column J: Time Since Notified
       ui.alert('Attendee has been marked as notified.');
       return;
     }
@@ -1298,7 +1287,6 @@ function processMarkAsNotified(selectedSessionId) {
 
   ui.alert('Attendee not found on the waitlist.');
 }
-
 
 // =========================
 // Mark as No Show Functions
