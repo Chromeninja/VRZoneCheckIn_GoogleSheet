@@ -21,7 +21,7 @@
       function submitSelection() {
         var selectedSpaces = [];
         var groupSize = <?= groupSize ?>;
-        var sessionId = '<?= generateSessionID("group") ?>'; // Generate session ID for the group check-in
+        var sessionId = '<?= generateSessionId("group") ?>'; // Generate session ID for the group check-in
 
         // Collect selected spaces
         for (var i = 0; i < groupSize; i++) {

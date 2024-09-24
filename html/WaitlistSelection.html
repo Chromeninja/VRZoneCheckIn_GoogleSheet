@@ -2,25 +2,38 @@
 <!DOCTYPE html>
 <html>
   <body>
+    <p><strong>Note:</strong> The format is "Name - Game".</p>
     <form id="waitlistForm">
       <label for="waitlistSelect"><?= title ?></label>
       <select id="waitlistSelect">
-        <? var entries = waitlistEntries; ?>
-        <? for (var i = 0; i < entries.length; i++) { ?>
-          <option value="<?= entries[i].sessionId ?>"><?= entries[i].firstName ?> - <?= entries[i].game ?></option>
+        <? if (waitlistEntries.length > 0) { ?>
+          <? for (var i = 0; i < waitlistEntries.length; i++) { ?>
+            <option value="<?= waitlistEntries[i].sessionId ?>">
+              <?= waitlistEntries[i].firstName ?> - <?= waitlistEntries[i].game ?>
+            </option>
+          <? } ?>
+        <? } else { ?>
+          <option value="">No attendees on the waitlist</option>
         <? } ?>
       </select><br><br>
       <input type="submit" value="<?= buttonLabel ?>">
     </form>
+
     <script>
-      var callbackFunction = '<?= callbackFunction ?>';
-      document.getElementById('waitlistForm').addEventListener('submit', function(event) {
-        event.preventDefault();
-        var selectedSessionId = document.getElementById('waitlistSelect').value;
-        google.script.run.withSuccessHandler(function() {
-          google.script.host.close();
-        })[callbackFunction](selectedSessionId);
-      });
+      function handleFormSubmit(formId, selectId, callbackFunction) {
+        const form = document.getElementById(formId);
+        form.addEventListener('submit', function(event) {
+          event.preventDefault();
+          const selectedValue = document.getElementById(selectId).value;
+
+          google.script.run.withSuccessHandler(function() {
+            google.script.host.close();
+          })[callbackFunction](selectedValue);
+        });
+      }
+
+      // Initialize the form submission process
+      handleFormSubmit('waitlistForm', 'waitlistSelect', 'processMoveFromWaitlist');
     </script>
   </body>
 </html>

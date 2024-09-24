@@ -20,6 +20,10 @@
         for (var i = 0; i < selectedOptions.length; i++) {
           selectedSpaces.push(selectedOptions[i].value);
         }
+        if (selectedSpaces.length === 0) {
+          alert('Please select at least one VR space to check out.');
+          return;
+        }
         google.script.run.withSuccessHandler(function() {
           google.script.host.close();
         }).processCheckOut(selectedSpaces);

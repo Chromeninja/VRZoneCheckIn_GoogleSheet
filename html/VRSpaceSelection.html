@@ -21,6 +21,10 @@
       document.getElementById('vrSpaceForm').addEventListener('submit', function(event) {
         event.preventDefault();
         var selectedSpace = document.getElementById('vrSpaceSelect').value;
+        if (!selectedSpace) {
+          alert('Please select a VR space.');
+          return;
+        }
         google.script.run.withSuccessHandler(function() {
           google.script.host.close();
         })[callbackFunction](selectedSpace, attendeeDataJSON, selectedGame, sessionId);

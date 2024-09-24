@@ -1,4 +1,4 @@
-<!-- GameSelectionGroup.html -->
+<!-- File Name: GameSelectionGroup.html -->
 <!DOCTYPE html>
 <html>
   <body>
@@ -19,7 +19,7 @@
         var selectedGame = document.getElementById('gameSelect').value;
         google.script.run.withSuccessHandler(function() {
           google.script.host.close();
-        }).proceedGroupCheckIn(selectedGame);
+        }).selectGameGroup(selectedGame);
       });
     </script>
   </body>
