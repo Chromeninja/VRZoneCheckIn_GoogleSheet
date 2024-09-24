@@ -4,30 +4,28 @@
   <body>
     <form id="vrSpaceForm">
       <label for="vrSpaceSelect">Select VR Space:</label>
-      <select id="vrSpaceSelect">
+      <select name="vrSpace" id="vrSpaceSelect">
         <? var spaces = availableSpaces; ?>
         <? for (var i = 0; i < spaces.length; i++) { ?>
           <option value="<?= spaces[i] ?>"><?= spaces[i] ?></option>
         <? } ?>
-      </select><br><br>
-      <input type="submit" value="Assign">
+      </select>
+      <br><br>
+      <input type="hidden" name="sessionId" value="<?= sessionId ?>">
+      <input type="hidden" name="selectedGame" value="<?= selectedGame ?>">
+      <input type="submit" value="Submit">
     </form>
+
     <script>
-      var attendeeDataJSON = '<?= attendeeData ?>';
-      var selectedGame = '<?= selectedGame ?>';
       var sessionId = '<?= sessionId ?>';
-      var callbackFunction = '<?= callbackFunction ?>';
+      var selectedGame = '<?= selectedGame ?>';
 
       document.getElementById('vrSpaceForm').addEventListener('submit', function(event) {
         event.preventDefault();
         var selectedSpace = document.getElementById('vrSpaceSelect').value;
-        if (!selectedSpace) {
-          alert('Please select a VR space.');
-          return;
-        }
         google.script.run.withSuccessHandler(function() {
           google.script.host.close();
-        })[callbackFunction](selectedSpace, attendeeDataJSON, selectedGame, sessionId);
+        }).selectVRSpace(selectedSpace, selectedGame, sessionId);
       });
     </script>
   </body>

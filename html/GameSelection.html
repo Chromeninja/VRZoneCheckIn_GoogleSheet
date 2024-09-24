@@ -9,12 +9,13 @@
         <? for (var i = 0; i < games.length; i++) { ?>
           <option value="<?= games[i] ?>"><?= games[i] ?></option>
         <? } ?>
-      </select><br><br>
+      </select>
+      <br><br>
+      <input type="hidden" name="sessionId" value="<?= sessionId ?>">
       <input type="submit" value="Submit">
     </form>
 
     <script>
-      var attendeeDataJSON = '<?= attendeeData ?>';
       var sessionId = '<?= sessionId ?>';
 
       document.getElementById('gameForm').addEventListener('submit', function(event) {
@@ -22,7 +23,7 @@
         var selectedGame = document.getElementById('gameSelect').value;
         google.script.run.withSuccessHandler(function() {
           google.script.host.close();
-        }).selectGame(selectedGame, attendeeDataJSON, sessionId);
+        }).selectGame(selectedGame, sessionId);
       });
     </script>
   </body>
