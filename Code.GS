@@ -1176,13 +1176,12 @@ function addToWaitlist(attendee, selectedGame, sessionId) {
     '',                             // Column B: Group Number (Empty for individual)
     '',                             // Column C: Group Leader (Empty for individual)
     attendee.firstName,             // Column D: First Name
-    attendee.lastName || '',        // Column E: Last Name
-    phoneNumber,                    // Column F: Phone Number
-    selectedGame,                   // Column G: Game
-    wlTime,                         // Column H: Waitlist Time
-    '',                             // Column I: Time Notified
-    '=NOW()-H' + rowToAdd,          // Column J: Time Since Added
-    '=IF(I' + rowToAdd + '="", "", NOW()-I' + rowToAdd + ')' // Column K: Time Since Notified
+    phoneNumber,                    // Column E: Phone Number
+    selectedGame,                   // Column F: Game
+    wlTime,                         // Column G: Waitlist Time
+    '',                             // Column H: Time Notified
+    '=NOW()-G' + rowToAdd,          // Column I: Time Since Added
+    '=IF(H' + rowToAdd + '="", "", NOW()-H' + rowToAdd + ')' // Column J: Time Since Notified
   ]);
 
   // Update tracker sheet with formulas for durations
