@@ -77,7 +77,6 @@ function getAttendeeInfo(firstName, lastName) {
       }
     }
   }
-
   return matches;
 }
 
@@ -136,31 +135,30 @@ function findAvailableSpacesForGame(selectedGame, vrSheet) {
 
   // Normalize the selectedGame to lowercase for comparison
   var normalizedSelectedGame = selectedGame.trim().toLowerCase();
-  Logger.log("Looking for available spaces for the game: " + normalizedSelectedGame);
+  
 
   for (var i = 1; i < data.length; i++) {
     var status = data[i][2]; // Column C: VR Space Status (Available/Occupied)
     var supportedGames = data[i][1]; // Column B: Supported Games
 
     // Logging to check the VR space and its supported games
-    Logger.log("Checking VR Space: " + data[i][0] + " | Status: " + status + " | Supported Games: " + supportedGames);
+    
 
     if (status === 'Available') {
       // Normalize supported games for comparison
       var supportedGamesArray = supportedGames.split(',').map(game => game.trim().toLowerCase());
-      Logger.log("Supported Games Array: " + supportedGamesArray);
+      
 
       // Check if the selected game is included in the supported games
       if (supportedGamesArray.includes(normalizedSelectedGame)) {
         availableSpaces.push(data[i][0]);
-        Logger.log("Space " + data[i][0] + " supports the selected game.");
+        
       } else {
-        Logger.log("Space " + data[i][0] + " does NOT support the selected game.");
+        
       }
     }
   }
 
-  Logger.log("Available Spaces: " + availableSpaces);
   return availableSpaces;
 }
 
