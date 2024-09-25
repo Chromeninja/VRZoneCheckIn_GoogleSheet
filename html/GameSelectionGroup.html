@@ -17,6 +17,7 @@
       document.getElementById('gameForm').addEventListener('submit', function(event) {
         event.preventDefault();
         var selectedGame = document.getElementById('gameSelect').value;
+
         google.script.run.withSuccessHandler(function() {
           google.script.host.close();
         }).selectGameGroup(selectedGame);

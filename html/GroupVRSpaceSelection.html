@@ -5,23 +5,28 @@
     <form id="vrSpaceForm">
       <? for (var i = 0; i < groupSize; i++) { ?>
         <div class="vr-space-selection">
-          <label for="space<?= i ?>">Player <?= i + 1 ?>:</label>
+          <label for="space<?= i ?>"><?= groupMembers[i].firstName ?>:</label>
           <select name="vrSpace<?= i ?>" id="space<?= i ?>">
-            <option value="">-- Select VR Space --</option>
             <? for (var j = 0; j < availableSpaces.length; j++) { ?>
-              <option value="<?= availableSpaces[j] ?>"><?= availableSpaces[j] ?></option>
+              <option value="<?= availableSpaces[j] ?>" <? if (j === i) { ?> selected <? } ?>>
+                <?= availableSpaces[j] ?>
+              </option>
             <? } ?>
           </select>
         </div>
       <? } ?>
-      <button type="button" class="submit-button" onclick="submitSelection()">Assign VR Spaces</button>
+      <button type="button" onclick="submitSelection()">Assign VR Spaces</button>
     </form>
 
     <script>
+      var groupMembers = JSON.parse('<?= groupMembers ?>');
+      var selectedGame = '<?= selectedGame ?>';
+      var groupNumber = '<?= groupNumber ?>';
+      var callbackFunction = '<?= callbackFunction ?>';
+      var groupSize = <?= groupSize ?>;
+
       function submitSelection() {
         var selectedSpaces = [];
-        var groupSize = <?= groupSize ?>;
-        var sessionId = '<?= generateSessionId("group") ?>'; // Generate session ID for the group check-in
 
         // Collect selected spaces
         for (var i = 0; i < groupSize; i++) {
@@ -40,29 +45,10 @@
           return;
         }
 
-        // Check if there are not enough spaces and trigger waitlist prompt directly
-        if (selectedSpaces.length < groupSize) {
-          // Prompt user to add to waitlist
-          var confirmWaitlist = confirm('Not enough VR spaces available for the group. Would you like to add the group to the waitlist?');
-          if (confirmWaitlist) {
-            var phoneNumber = prompt('Please enter the group leader\'s phone number:');
-            if (phoneNumber) {
-              // After collecting the phone number, call the backend to add to waitlist
-              google.script.run.withSuccessHandler(function() {
-                alert('Group added to the waitlist successfully.');
-                google.script.host.close();
-              }).addGroupToWaitlist(<?= groupMembers ?>, '<?= selectedGame ?>', sessionId, groupSize, <?= groupNumber ?>, phoneNumber);
-            } else {
-              alert('Phone number is required to add the group to the waitlist.');
-            }
-          }
-          return;
-        }
-
-        // If all spaces are selected and valid, proceed with assigning spaces
+        // Call the callback function to finalize the assignment
         google.script.run.withSuccessHandler(function() {
           google.script.host.close();
-        }).assignVRSpacesToGroup(selectedSpaces, '<?= selectedGame ?>', <?= groupNumber ?>, '<?= groupMembers ?>', sessionId); 
+        })[callbackFunction](selectedSpaces, JSON.stringify(groupMembers), selectedGame, groupNumber);
       }
     </script>
   </body>

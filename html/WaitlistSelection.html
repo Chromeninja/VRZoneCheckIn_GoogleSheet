@@ -9,7 +9,7 @@
         <? if (waitlistEntries.length > 0) { ?>
           <? for (var i = 0; i < waitlistEntries.length; i++) { ?>
             <option value="<?= waitlistEntries[i].sessionId ?>">
-              <?= waitlistEntries[i].firstName ?> - <?= waitlistEntries[i].game ?>
+              <?= waitlistEntries[i].displayName ?>
             </option>
           <? } ?>
         <? } else { ?>
@@ -20,11 +20,18 @@
     </form>
 
     <script>
+      var callbackFunction = '<?= callbackFunction ?>';
+
       function handleFormSubmit(formId, selectId, callbackFunction) {
         const form = document.getElementById(formId);
         form.addEventListener('submit', function(event) {
           event.preventDefault();
           const selectedValue = document.getElementById(selectId).value;
+
+          if (!selectedValue) {
+            alert('Please select an attendee or group.');
+            return;
+          }
 
           google.script.run.withSuccessHandler(function() {
             google.script.host.close();
@@ -32,8 +39,8 @@
         });
       }
 
-      // Initialize the form submission process
-      handleFormSubmit('waitlistForm', 'waitlistSelect', 'processMoveFromWaitlist');
+      // Initialize the form submission process with the correct callback function
+      handleFormSubmit('waitlistForm', 'waitlistSelect', callbackFunction);
     </script>
   </body>
 </html>
