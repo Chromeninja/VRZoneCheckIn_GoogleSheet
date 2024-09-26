@@ -1600,7 +1600,6 @@ function processMarkAsNotified(selectedSessionId) {
   }
 }
 
-
 // =========================
 // Mark as No Show Functions
 // =========================

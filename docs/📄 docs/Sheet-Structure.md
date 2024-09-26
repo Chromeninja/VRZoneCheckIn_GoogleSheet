@@ -73,6 +73,23 @@ Tracks attendees waiting for an available VR space, including group and timing i
 | **Time Since Added**| Time since the attendee was added to the waitlist |
 | **Time Since Notified** | Time since the attendee was notified        |
 
+## 5. **VRSpaces Sheet**
+
+Tracks all VR stations, their availability, and assigned attendees.
+
+| Column         | Description                                       |
+|----------------|---------------------------------------------------|
+| **A: VR Space**         | Name of the VR station (e.g., "VR 1")             |
+| **B: Supported Games**  | List of games supported by this VR space        |
+| **C: Status**           | Availability status (Available/Occupied)         |
+| **D: First Name**       | **First name** of the attendee assigned (only first name is recorded) |
+| **E: Game**             | Game being played at this station                 |
+| **F: Session ID**       | Unique session identifier for the attendee        |
+| **G: Check-In Time**    | Timestamp when the attendee started their session |
+| **H: Duration**         | Duration of the VR session (calculated)           |
+
+
+
 ### Additional Features:
 - Color formatting for headers.
 - Button to mark attendees as **No Show** or **Notified**.
