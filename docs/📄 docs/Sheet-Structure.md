@@ -6,15 +6,16 @@ The VR Zone Group Check-In System uses a Google Sheet with multiple tabs to mana
 
 Tracks all VR stations, their availability, and assigned attendees.
 
-| Column         | Description                                       |
-|----------------|---------------------------------------------------|
-| **VR Space**   | Name of the VR station (e.g., "VR 1")             |
-| **Status**     | Availability status (Available/Occupied)          |
-| **Game**       | Game being played at this station                 |
-| **First Name** | First name of the attendee assigned               |
-| **Last Name**  | Last name of the attendee assigned                |
-| **Check-In Time** | Timestamp when the attendee started their session |
-| **Duration**   | Duration of the VR session (calculated)           |
+| Column         | Description                                                   |
+|----------------|---------------------------------------------------------------|
+| **VR Space**   | Name of the VR station (e.g., "VR 1")                         |
+| **Supported Games**  | List of games supported by this VR space                   |
+| **Status**     | Availability status (Available/Occupied)                      |
+| **First Name** | First name of the attendee assigned                           |
+| **Game**       | Game being played at this station                             |
+| **Session ID** | Unique session identifier for the attendee                    |
+| **Check-In Time** | Timestamp when the attendee started their session          |
+| **Duration**   | Duration of the VR session (calculated)                       |
 
 Additional Features:
 - Color formatting for headers.
@@ -27,17 +28,26 @@ Additional Features:
 
 Logs every check-in and check-out with details for each session.
 
-| Column         | Description                                       |
-|----------------|---------------------------------------------------|
-| **Session ID** | Unique session identifier                         |
-| **Unique ID**  | Unique ID for the attendee                        |
-| **First Name** | First name of the attendee                        |
-| **Last Name**  | Last name of the attendee                         |
-| **VR Space**   | The VR station assigned to the attendee           |
-| **Game**       | The game the attendee selected                    |
-| **Check-In Time** | Timestamp when the attendee checked in          |
-| **Check-Out Time** | Timestamp when the attendee checked out        |
-| **Duration**   | Total time the attendee spent in VR               |
+| Column         | Description                                                   |
+|----------------|---------------------------------------------------------------|
+| **Session ID** | Unique session identifier                                      |
+| **Unique ID**  | Unique ID for the attendee                                     |
+| **First Name** | First name of the attendee                                     |
+| **Last Name**  | Last name of the attendee                                      |
+| **Full Name**  | Full name (combination of First and Last name)                 |
+| **Group Leader** | Name of the group leader (for group check-ins)               |
+| **Group Number** | Number representing the group size                          |
+| **Check-In Time** | Timestamp when the attendee checked in                     |
+| **Check-Out Time** | Timestamp when the attendee checked out                   |
+| **Waitlist Duration** | Total time spent on the waitlist                       |
+| **Session Duration** | Total time spent playing the game                       |
+| **Game**       | The game the attendee selected                                 |
+| **VR Space**   | The VR station assigned to the attendee                        |
+| **Session Status** | Status of the session (Active/Completed)                  |
+| **Visit Count** | How many times the attendee has checked in                    |
+| **Notes**      | Any additional notes related to the session                    |
+| **Error Flag** | Flag indicating if there were any issues during the session    |
+| **No Show**    | Flag indicating if the attendee was a no-show                  |
 
 Prefilled formulas for:
 - **Duration** columns to calculate time based on check-in and check-out times.
@@ -47,49 +57,43 @@ Prefilled formulas for:
 
 Stores legal waiver and user consent details, imported from a Google Form.
 
-| Column        | Description                                       |
-|---------------|---------------------------------------------------|
-| **Timestamp** | Time when the attendee submitted the form          |
-| **First Name** | First name of the attendee                        |
-| **Last Name** | Last name of the attendee                         |
-| **Email**     | Attendee’s email address                          |
-| **Consent**   | Whether the attendee agreed to the legal terms (Yes/No) |
-| **Signature** | Attendee's electronic signature                   |
+| Column        | Description                                                   |
+|---------------|---------------------------------------------------------------|
+| **Timestamp** | Time when the attendee submitted the form                      |
+| **First Name** | First name of the attendee                                    |
+| **Last Name** | Last name of the attendee                                      |
+| **Email**     | Attendee’s email address                                       |
+| **Minor**     | Whether the attendee is a minor (Yes/No)                       |
+| **Age**       | Age of the attendee                                            |
+| **Gender**    | Gender of the attendee                                         |
+| **Played VR Before** | Whether the attendee has prior VR experience (Yes/No)  |
+| **Own VR**    | Whether the attendee owns a VR headset (Yes/No)                |
+| **Likely to Buy VR** | Likelihood of purchasing a VR headset (Rating)         |
+| **Guardian First Name** | Guardian's first name (if a minor)                   |
+| **Guardian Last Name** | Guardian's last name (if a minor)                     |
+| **Mobile Number** | Attendee's or guardian's mobile number                     |
+| **Liability Waiver** | Whether the attendee agreed to the liability waiver (Yes/No) |
+| **E-Sign Consent** | Whether the attendee agreed to electronic signature (Yes/No) |
+| **Unique ID** | Unique identifier for the attendee                             |
 
 ## 4. **Waitlist Sheet**
 
 Tracks attendees waiting for an available VR space, including group and timing information.
 
-| Column            | Description                                      |
-|-------------------|--------------------------------------------------|
-| **Session ID**     | Unique session identifier, corresponding to the attendee |
-| **Group Number**   | Group number (if part of a group)               |
-| **Group Leader**   | Name of the group leader (for group check-ins)  |
-| **FName**          | First name of the attendee                      |
-| **Phone Number**   | Phone number of the attendee (for notifications) |
-| **Game**           | Game the attendee or group selected             |
-| **WL Time**        | Time the attendee was added to the waitlist     |
-| **Time Notified**  | Time when the attendee was notified of space availability |
-| **Time Since Added**| Time since the attendee was added to the waitlist |
-| **Time Since Notified** | Time since the attendee was notified        |
+| Column             | Description                                                   |
+|--------------------|---------------------------------------------------------------|
+| **Session ID**      | Unique session identifier, corresponding to the attendee      |
+| **Group Number**    | Group number (if part of a group)                             |
+| **Group Leader**    | Name of the group leader                                      |
+| **First Name**      | First name of the attendee                                    |
+| **Phone Number**    | Phone number of the attendee (for notifications)              |
+| **Game**            | Game the attendee or group selected                           |
+| **Waitlist Time**   | Time the attendee was added to the waitlist                   |
+| **Time Notified**   | Time when the attendee was notified of space availability     |
+| **Time Since Added**| Time since the attendee was added to the waitlist (Formula)   |
+| **Time Since Notified** | Time since the attendee was notified (Formula)           |
 
-## 5. **VRSpaces Sheet**
+## Additional Features:
 
-Tracks all VR stations, their availability, and assigned attendees.
-
-| Column         | Description                                       |
-|----------------|---------------------------------------------------|
-| **A: VR Space**         | Name of the VR station (e.g., "VR 1")             |
-| **B: Supported Games**  | List of games supported by this VR space        |
-| **C: Status**           | Availability status (Available/Occupied)         |
-| **D: First Name**       | **First name** of the attendee assigned (only first name is recorded) |
-| **E: Game**             | Game being played at this station                 |
-| **F: Session ID**       | Unique session identifier for the attendee        |
-| **G: Check-In Time**    | Timestamp when the attendee started their session |
-| **H: Duration**         | Duration of the VR session (calculated)           |
-
-
-
-### Additional Features:
-- Color formatting for headers.
-- Button to mark attendees as **No Show** or **Notified**.
+- Buttons to mark attendees as **No Show** or **Notified**.
+- Auto-calculated durations for waiting and session lengths.
