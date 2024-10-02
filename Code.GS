@@ -22,41 +22,47 @@ function generateSessionId(uniqueId) {
  */
 function getAttendeeInfo(firstName, lastName) {
   var legalSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Legal');
-  var data = legalSheet.getDataRange().getValues();
+  var lastRow = legalSheet.getLastRow();
+  if (lastRow < 2) return []; // No data
+
+  // Fetch data from all relevant columns (A to Q)
+  var dataRange = legalSheet.getRange(2, 1, lastRow - 1, 17); // Rows 2 to lastRow, Columns A (1) to Q (17)
+  var data = dataRange.getValues();
+
   var matches = [];
 
   firstName = firstName.toLowerCase().trim();
   if (lastName) lastName = lastName.toLowerCase().trim();
 
-  for (var i = 1; i < data.length; i++) { // Assuming the first row is headers
-    var sheetFirstName = data[i][3]; // Column D: First Name
-    var sheetLastName = data[i][4];  // Column E: Last Name
+  for (var i = 0; i < data.length; i++) { // Start from first data row
+    var sheetFirstName = data[i][3]; // Column D: Index 3
+    var sheetLastName = data[i][4];  // Column E: Index 4
     if (!sheetFirstName) continue;
 
     if (sheetFirstName.toString().trim().toLowerCase() === firstName) {
       if (lastName) {
-        if (sheetLastName.toString().trim().toLowerCase() === lastName) {
+        if (sheetLastName && sheetLastName.toString().trim().toLowerCase() === lastName) {
           matches.push({
-            uniqueId: data[i][16],
-            firstName: data[i][3],
-            lastName: data[i][4],
-            phoneNumber: data[i][13],
-            isMinor: data[i][5].toString().trim().toLowerCase() === 'yes',
-            email: data[i][1],
-            guardianFirstName: data[i][11],
-            guardianLastName: data[i][12]
+            uniqueId: data[i][16], // Column Q: Index 16
+            firstName: data[i][3], // Column D: Index 3
+            lastName: data[i][4],  // Column E: Index 4
+            phoneNumber: data[i][13], // Column N: Index 13
+            isMinor: data[i][5].toString().trim().toLowerCase() === 'yes', // Column F: Index 5
+            email: data[i][1], // Column B: Index 1
+            guardianFirstName: data[i][11], // Column L: Index 11
+            guardianLastName: data[i][12]  // Column M: Index 12
           });
         }
       } else {
         matches.push({
-          uniqueId: data[i][16],
-          firstName: data[i][3],
-          lastName: data[i][4],
-          phoneNumber: data[i][13],
-          isMinor: data[i][5].toString().trim().toLowerCase() === 'yes',
-          email: data[i][1],
-          guardianFirstName: data[i][11],
-          guardianLastName: data[i][12]
+          uniqueId: data[i][16], // Column Q: Index 16
+          firstName: data[i][3], // Column D: Index 3
+          lastName: data[i][4],  // Column E: Index 4
+          phoneNumber: data[i][13], // Column N: Index 13
+          isMinor: data[i][5].toString().trim().toLowerCase() === 'yes', // Column F: Index 5
+          email: data[i][1], // Column B: Index 1
+          guardianFirstName: data[i][11], // Column L: Index 11
+          guardianLastName: data[i][12]  // Column M: Index 12
         });
       }
     }
@@ -71,13 +77,18 @@ function getAttendeeInfo(firstName, lastName) {
  */
 function checkDuplicateFirstName(firstName) {
   var legalSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Legal');
-  var data = legalSheet.getDataRange().getValues();
-  var count = 0;
+  var lastRow = legalSheet.getLastRow();
+  if (lastRow < 2) return false; // No data
 
+  // Read only the First Name column (Column D: Index 3)
+  var firstNameRange = legalSheet.getRange(2, 4, lastRow - 1, 1); // Column D
+  var firstNameData = firstNameRange.getValues();
+
+  var count = 0;
   firstName = firstName.toLowerCase().trim();
 
-  for (var i = 1; i < data.length; i++) { // Assuming the first row is headers
-    var legalFirstName = data[i][3];
+  for (var i = 0; i < firstNameData.length; i++) {
+    var legalFirstName = firstNameData[i][0];
     if (legalFirstName && legalFirstName.toString().trim().toLowerCase() === firstName) {
       count++;
       if (count > 1) return true;
@@ -91,11 +102,17 @@ function checkDuplicateFirstName(firstName) {
  * @param {Sheet} vrSheet - The VRSpaces sheet.
  * @returns {Array} - An array of unique supported games.
  */
- function findAvailableGames(vrSheet) {
+function findAvailableGames(vrSheet) {
+  var lastRow = vrSheet.getLastRow();
+  if (lastRow < 2) return []; // No data
+
+  // Read only the Supported Games column (Column B: Index 2)
+  var supportedGamesRange = vrSheet.getRange(2, 2, lastRow - 1, 1); // Column B
+  var supportedGamesData = supportedGamesRange.getValues();
+
   var supportedGamesSet = new Set();
-  var data = vrSheet.getDataRange().getValues();
-  for (var i = 1; i < data.length; i++) { // Assuming the first row is headers
-    var supportedGames = data[i][1]; // Column B: Supported Games
+  for (var i = 0; i < supportedGamesData.length; i++) {
+    var supportedGames = supportedGamesData[i][0];
     if (supportedGames) {
       supportedGames.split(',').forEach(function(game) {
         supportedGamesSet.add(game.trim());
@@ -103,8 +120,7 @@ function checkDuplicateFirstName(firstName) {
     }
   }
 
-  var gamesArray = Array.from(supportedGamesSet);
-  return gamesArray;
+  return Array.from(supportedGamesSet);
 }
 
 /**
@@ -114,31 +130,32 @@ function checkDuplicateFirstName(firstName) {
  * @returns {Array} - An array of available spaces for the selected game.
  */
 function findAvailableSpacesForGame(selectedGame, vrSheet) {
-  var data = vrSheet.getDataRange().getValues();
+  var lastRow = vrSheet.getLastRow();
+  if (lastRow < 2) return []; // No data
+
+  // Read only Columns A to C (VR Space, Supported Games, Status)
+  var dataRange = vrSheet.getRange(2, 1, lastRow - 1, 3); // Columns A, B, C
+  var data = dataRange.getValues();
   var availableSpaces = [];
 
-  // Normalize the selectedGame to lowercase for comparison
   var normalizedSelectedGame = selectedGame.trim().toLowerCase();
-  
 
-  for (var i = 1; i < data.length; i++) {
-    var status = data[i][2]; // Column C: VR Space Status (Available/Occupied)
-    var supportedGames = data[i][1]; // Column B: Supported Games    
+  for (var i = 0; i < data.length; i++) {
+    var vrSpace = data[i][0];            // Column A: VR Space
+    var supportedGames = data[i][1];     // Column B: Supported Games
+    var status = data[i][2];             // Column C: Status
 
-    if (status === 'Available') {
-      // Normalize supported games for comparison
-      var supportedGamesArray = supportedGames.split(',').map(game => game.trim().toLowerCase());
-      
+    if (status === 'Available' && supportedGames) {
+      var supportedGamesArray = supportedGames.split(',').map(function(game) {
+        return game.trim().toLowerCase();
+      });
 
-      // Check if the selected game is included in the supported games
       if (supportedGamesArray.includes(normalizedSelectedGame)) {
-        availableSpaces.push(data[i][0]);
-        
-      } else {
-        
+        availableSpaces.push(vrSpace);
       }
     }
   }
+
   return availableSpaces;
 }
 
@@ -149,15 +166,26 @@ function findAvailableSpacesForGame(selectedGame, vrSheet) {
  * @param {string} errorMessage - The error message to log.
  */
 function setErrorFlag(trackerSheet, sessionId, errorMessage) {
-  var data = trackerSheet.getDataRange().getValues();
+  var lastRow = trackerSheet.getLastRow();
+  if (lastRow < 2) return; // No data
 
-  for (var i = 1; i < data.length; i++) { // Assuming the first row is headers
-    if (data[i][0] === sessionId) {
-      var rowToUpdate = i + 1;
-      trackerSheet.getRange(rowToUpdate, 19).setValue(true); // Column S: Error Flag
-      trackerSheet.getRange(rowToUpdate, 18).setValue(errorMessage); // Column R: Notes
+  // Read only the Session ID column (Column A: Index 0)
+  var sessionIdRange = trackerSheet.getRange(2, 1, lastRow - 1, 1); // Column A
+  var sessionIds = sessionIdRange.getValues();
+
+  var rowToUpdate = -1;
+
+  for (var i = 0; i < sessionIds.length; i++) {
+    if (sessionIds[i][0] === sessionId) {
+      rowToUpdate = i + 2; // Adjust for header row
       break;
     }
+  }
+
+  if (rowToUpdate !== -1) {
+    // Batch write: Set Error Flag and Notes in one operation
+    trackerSheet.getRange(rowToUpdate, 18, 1, 2).setValues([[errorMessage, true]]);
+    // Note: Columns R (18) and S (19). Adjusted to R and S.
   }
 }
 
@@ -368,7 +396,6 @@ function selectVRSpace(selectedSpace, selectedGame, sessionId) {
 
 /**
  * Updates the Tracker sheet for individual check-in and waitlist.
- * Instead of appending a new row, it updates the existing entry based on Session ID.
  * @param {Sheet} trackerSheet - The Tracker sheet.
  * @param {Object} attendee - The attendee object.
  * @param {string} selectedSpace - The assigned VR space or 'Waitlist'.
@@ -377,66 +404,116 @@ function selectVRSpace(selectedSpace, selectedGame, sessionId) {
  * @param {boolean} isWaitlisted - Indicates if the attendee is added to the waitlist.
  */
 function updateCheckInTracker(trackerSheet, attendee, selectedSpace, selectedGame, sessionId, isWaitlisted) {
-  var fullName = attendee.firstName + ' ' + (attendee.lastName || '');
-  var currentTime = new Date();
+  var lock = LockService.getDocumentLock();
+  try {
+    lock.waitLock(10000); // Wait up to 10 seconds for the lock
 
-  // Find the row in Tracker sheet matching the Session ID
-  var data = trackerSheet.getDataRange().getValues();
-  var rowToUpdate = -1;
+    var dataRange = trackerSheet.getDataRange();
+    var data = dataRange.getValues();
 
-  for (var i = 1; i < data.length; i++) { // Start at 1 to skip headers
-    if (data[i][0] === sessionId) { // Column A: Session ID
-      rowToUpdate = i + 1; // 1-based indexing for sheet rows
-      break;
+    var rowToUpdate = -1;
+    var currentTime = new Date();
+    var fullName = attendee.firstName + ' ' + (attendee.lastName || '');
+    var visitCount = getVisitCount(trackerSheet, attendee.uniqueId);
+
+    // Define column indices (1-based indexing)
+    var colSessionId = 1; // Column A
+    var colUniqueId = 2;  // Column B
+    var colFirstName = 3; // Column C
+    var colLastName = 4;  // Column D
+    var colFullName = 5;  // Column E
+    var colWaitlistTime = 8; // Column H
+    var colCheckInTime = 9;  // Column I
+    var colCheckOutTime = 10; // Column J
+    var colWaitlistDuration = 11; // Column K
+    var colSessionDuration = 12; // Column L
+    var colTotalDuration = 13; // Column M
+    var colGame = 14; // Column N
+    var colVRSpace = 15; // Column O
+    var colSessionStatus = 16; // Column P
+    var colVisitCount = 17; // Column Q
+
+    // Search for existing session ID
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][colSessionId - 1] === sessionId) {
+        rowToUpdate = i + 1; // Adjust for header row
+        break;
+      }
     }
-  }
 
-  if (rowToUpdate === -1) {
-    // If not found, append a new row (optional)
-    trackerSheet.appendRow([
-      sessionId,                        // Column A: Session ID
-      attendee.uniqueId || '',          // Column B: Unique ID
-      attendee.firstName,               // Column C: First Name
-      attendee.lastName || '',          // Column D: Last Name
-      fullName,                         // Column E: Full Name
-      "",                               // Column F: Group Leader
-      "",                               // Column G: Group Number
-      "",                               // Column H: Waitlist Time
-      isWaitlisted ? "" : currentTime,  // Column I: Check-In Time
-      "",                               // Column J: Check-Out Time
-      "",                               // Column K: Waitlist Duration (Formula)
-      "",                               // Column L: Session Duration (Formula)
-      "",                               // Column M: Total Duration (Formula)
-      selectedGame,                     // Column N: Game
-      selectedSpace,                    // Column O: VR Space or 'Waitlist'
-      isWaitlisted ? "Waiting" : "Active", // Column P: Session Status
-      getVisitCount(trackerSheet, attendee.uniqueId), // Column Q: Visit Count
-      "",                               // Column R: Notes
-      "",                               // Column S: Error Flag
-      ""                                // Column T: No Show
-    ]);
-    rowToUpdate = trackerSheet.getLastRow();
-  } else {
-    // Update existing row
-    if (isWaitlisted) {
-      trackerSheet.getRange(rowToUpdate, 8).setValue(""); // Column H: Waitlist Time cleared
-      trackerSheet.getRange(rowToUpdate, 9).setValue(""); // Column I: Check-In Time cleared
-      trackerSheet.getRange(rowToUpdate, 15).setValue("Waiting"); // Column P: Session Status
+    if (rowToUpdate === -1) {
+      // Append new row
+      var newRow = [];
+      newRow[colSessionId - 1] = sessionId;
+      newRow[colUniqueId - 1] = attendee.uniqueId || '';
+      newRow[colFirstName - 1] = attendee.firstName;
+      newRow[colLastName - 1] = attendee.lastName || '';
+      newRow[colFullName - 1] = fullName;
+      // Columns F (Group Leader) and G (Group Number) can be left empty
+      newRow[colGame - 1] = selectedGame;
+      newRow[colVRSpace - 1] = selectedSpace;
+      newRow[colSessionStatus - 1] = isWaitlisted ? 'Waiting' : 'Active';
+      newRow[colVisitCount - 1] = visitCount;
+
+      if (isWaitlisted) {
+        newRow[colWaitlistTime - 1] = currentTime;
+      } else {
+        newRow[colCheckInTime - 1] = currentTime;
+      }
+
+      trackerSheet.appendRow(newRow);
+      rowToUpdate = trackerSheet.getLastRow();
     } else {
-      trackerSheet.getRange(rowToUpdate, 9).setValue(currentTime); // Column I: Check-In Time
-      trackerSheet.getRange(rowToUpdate, 15).setValue("Active"); // Column P: Session Status
+      // Update existing row
+      var updateRange = trackerSheet.getRange(rowToUpdate, 1, 1, trackerSheet.getLastColumn());
+      var rowData = updateRange.getValues()[0];
+
+      if (isWaitlisted) {
+        rowData[colWaitlistTime - 1] = currentTime;
+        rowData[colSessionStatus - 1] = 'Waiting';
+        rowData[colVRSpace - 1] = 'Waitlist';
+      } else {
+        rowData[colCheckInTime - 1] = currentTime;
+        rowData[colSessionStatus - 1] = 'Active';
+        rowData[colVRSpace - 1] = selectedSpace;
+      }
+
+      rowData[colGame - 1] = selectedGame;
+      rowData[colVisitCount - 1] = visitCount;
+
+      updateRange.setValues([rowData]);
     }
-    trackerSheet.getRange(rowToUpdate, 14).setValue(selectedGame); // Column N: Game
-    trackerSheet.getRange(rowToUpdate, 15).setValue(isWaitlisted ? "Waiting" : "Active"); // Column P: Session Status
-    trackerSheet.getRange(rowToUpdate, 16).setValue(getVisitCount(trackerSheet, attendee.uniqueId)); // Column Q: Visit Count
 
-    // Optionally, you can set other columns if needed
+    // Update durations
+    updateDurations(trackerSheet, rowToUpdate);
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('An error occurred while updating the Tracker: ' + error.message);
+  } finally {
+    lock.releaseLock();
   }
+}
 
-  // Update formulas for durations
-  trackerSheet.getRange(rowToUpdate, 11).setFormula('=IF(H' + rowToUpdate + '="", "N/A", NOW()-H' + rowToUpdate + ')'); // Column K: Waitlist Duration
-  trackerSheet.getRange(rowToUpdate, 12).setFormula('=IF(I' + rowToUpdate + '="", "N/A", NOW()-I' + rowToUpdate + ')'); // Column L: Session Duration
-  trackerSheet.getRange(rowToUpdate, 13).setFormula('=IF(K' + rowToUpdate + '="N/A", L' + rowToUpdate + ', K' + rowToUpdate + ')'); // Column M: Total Duration
+/**
+ * Updates the durations in the Tracker sheet.
+ * @param {Sheet} trackerSheet - The Tracker sheet.
+ * @param {number} row - The row number to update.
+ */
+function updateDurations(trackerSheet, row) {
+  var now = new Date();
+  var waitlistTime = trackerSheet.getRange(row, 8).getValue(); // Column H
+  var checkInTime = trackerSheet.getRange(row, 9).getValue();  // Column I
+  var checkOutTime = trackerSheet.getRange(row, 10).getValue(); // Column J
+
+  var waitlistDuration = waitlistTime ? ((checkInTime || now) - waitlistTime) / 1000 / 60 : 'N/A'; // In minutes
+  var sessionDuration = checkInTime ? ((checkOutTime || now) - checkInTime) / 1000 / 60 : 'N/A';  // In minutes
+  var totalDuration = waitlistDuration !== 'N/A' && sessionDuration !== 'N/A' ? waitlistDuration + sessionDuration :
+                      waitlistDuration !== 'N/A' ? waitlistDuration :
+                      sessionDuration !== 'N/A' ? sessionDuration : 'N/A';
+
+  trackerSheet.getRange(row, 11).setValue(waitlistDuration); // Column K
+  trackerSheet.getRange(row, 12).setValue(sessionDuration);  // Column L
+  trackerSheet.getRange(row, 13).setValue(totalDuration);    // Column M
 }
 
 /**
@@ -740,7 +817,17 @@ function assignVRSpacesToGroup(selectedSpaces, groupMembersJSON, selectedGame, g
 
 /**
  * Updates the Tracker sheet for group check-in and waitlist.
- * Updates the existing entry based on Session ID.
+ * @param {Sheet} trackerSheet - The Tracker sheet.
+ * @param {Object} attendee - The attendee object.
+ * @param {string} selectedSpace - The assigned VR space or 'Waitlist'.
+ * @param {string} selectedGame - The selected game.
+ * @param {string} sessionId - The unique session ID for this attendee.
+ * @param {boolean} isLeader - Indicates if the attendee is the group leader.
+ * @param {string} groupNumber - The unique group number.
+ * @param {Object} groupLeader - The group leader object.
+ */
+/**
+ * Updates the Tracker sheet for group check-in and waitlist.
  * @param {Sheet} trackerSheet - The Tracker sheet.
  * @param {Object} attendee - The attendee object.
  * @param {string} selectedSpace - The assigned VR space or 'Waitlist'.
@@ -751,92 +838,101 @@ function assignVRSpacesToGroup(selectedSpaces, groupMembersJSON, selectedGame, g
  * @param {Object} groupLeader - The group leader object.
  */
 function updateCheckInTrackerGroup(trackerSheet, attendee, selectedSpace, selectedGame, sessionId, isLeader, groupNumber, groupLeader) {
-  var fullName = attendee.firstName + ' ' + (attendee.lastName || '');
-  var groupLeaderFullName = groupLeader.firstName + ' ' + (groupLeader.lastName || '');
-  var currentTime = new Date();
+  var lock = LockService.getDocumentLock();
+  try {
+    lock.waitLock(10000); // Wait up to 10 seconds for the lock
 
-  // Define column indices for clarity
-  var colSessionId = 1; // Column A
-  var colUniqueId = 2; // Column B
-  var colFirstName = 3; // Column C
-  var colLastName = 4; // Column D
-  var colFullName = 5; // Column E
-  var colGroupLeader = 6; // Column F
-  var colGroupNumber = 7; // Column G
-  var colWaitlistTime = 8; // Column H
-  var colCheckInTime = 9; // Column I
-  var colCheckOutTime = 10; // Column J
-  var colWaitlistDuration = 11; // Column K
-  var colSessionDuration = 12; // Column L
-  var colTotalDuration = 13; // Column M
-  var colGame = 14; // Column N
-  var colVRSpace = 15; // Column O
-  var colSessionStatus = 16; // Column P
-  var colVisitCount = 17; // Column Q
-  var colNotes = 18; // Column R
-  var colErrorFlag = 19; // Column S
-  var colNoShow = 20; // Column T
+    // Define isWaitlisted based on selectedSpace
+    var isWaitlisted = selectedSpace === 'Waitlist';
 
-  // Determine session status based on selected space
-  var isWaitlisted = (selectedSpace === 'Waitlist');
-  var sessionStatus = isWaitlisted ? 'Waiting' : 'Active';
+    var dataRange = trackerSheet.getDataRange();
+    var data = dataRange.getValues();
 
-  // Find the row in Tracker sheet matching the Session ID
-  var data = trackerSheet.getDataRange().getValues();
-  var rowToUpdate = -1;
+    var rowToUpdate = -1;
+    var currentTime = new Date();
+    var fullName = attendee.firstName + ' ' + (attendee.lastName || '');
+    var groupLeaderFullName = groupLeader.firstName + ' ' + (groupLeader.lastName || '');
+    var visitCount = getVisitCount(trackerSheet, attendee.uniqueId);
 
-  for (var i = 1; i < data.length; i++) { // Start at 1 to skip headers
-    if (data[i][colSessionId - 1] === sessionId) { // Column A: Session ID
-      rowToUpdate = i + 1; // 1-based indexing for sheet rows
-      break;
+    // Define column indices (1-based indexing)
+    var colSessionId = 1; // Column A
+    var colUniqueId = 2;  // Column B
+    var colFirstName = 3; // Column C
+    var colLastName = 4;  // Column D
+    var colFullName = 5;  // Column E
+    var colGroupLeader = 6; // Column F
+    var colGroupNumber = 7; // Column G
+    var colWaitlistTime = 8; // Column H
+    var colCheckInTime = 9;  // Column I
+    var colCheckOutTime = 10; // Column J
+    var colWaitlistDuration = 11; // Column K
+    var colSessionDuration = 12; // Column L
+    var colTotalDuration = 13; // Column M
+    var colGame = 14; // Column N
+    var colVRSpace = 15; // Column O
+    var colSessionStatus = 16; // Column P
+    var colVisitCount = 17; // Column Q
+
+    // Search for existing session ID
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][colSessionId - 1] === sessionId) {
+        rowToUpdate = i + 1; // Adjust for header row
+        break;
+      }
     }
-  }
 
-  if (rowToUpdate === -1) {
-    // If not found, append a new row
-    trackerSheet.appendRow([
-      sessionId,                               // Column A: Session ID
-      attendee.uniqueId || '',                 // Column B: Unique ID
-      attendee.firstName,                      // Column C: First Name
-      attendee.lastName || '',                 // Column D: Last Name
-      fullName,                                // Column E: Full Name
-      groupLeaderFullName,                     // Column F: Group Leader
-      groupNumber || '',                       // Column G: Group Number
-      isWaitlisted ? currentTime : '',         // Column H: Waitlist Time
-      isWaitlisted ? '' : currentTime,         // Column I: Check-In Time
-      "",                                      // Column J: Check-Out Time
-      "",                                      // Column K: Waitlist Duration
-      "",                                      // Column L: Session Duration
-      "",                                      // Column M: Total Duration
-      selectedGame,                            // Column N: Game
-      selectedSpace,                           // Column O: VR Space or 'Waitlist'
-      sessionStatus,                           // Column P: Session Status
-      getVisitCount(trackerSheet, attendee.uniqueId), // Column Q: Visit Count
-      "",                                      // Column R: Notes
-      "",                                      // Column S: Error Flag
-      ""                                       // Column T: No Show
-    ]);
-    rowToUpdate = trackerSheet.getLastRow();
-  } else {
-    // Update existing row
-    if (isWaitlisted) {
-      trackerSheet.getRange(rowToUpdate, colWaitlistTime).setValue(currentTime); // Column H: Waitlist Time
-      trackerSheet.getRange(rowToUpdate, colSessionStatus).setValue("Waiting"); // Column P: Session Status
-      trackerSheet.getRange(rowToUpdate, colVRSpace).setValue('Waitlist'); // Column O: VR Space
+    if (rowToUpdate === -1) {
+      // Append new row
+      var newRow = [];
+      newRow[colSessionId - 1] = sessionId;
+      newRow[colUniqueId - 1] = attendee.uniqueId || '';
+      newRow[colFirstName - 1] = attendee.firstName;
+      newRow[colLastName - 1] = attendee.lastName || '';
+      newRow[colFullName - 1] = fullName;
+      newRow[colGroupLeader - 1] = groupLeaderFullName;
+      newRow[colGroupNumber - 1] = groupNumber || '';
+      newRow[colGame - 1] = selectedGame;
+      newRow[colVRSpace - 1] = selectedSpace;
+      newRow[colSessionStatus - 1] = isWaitlisted ? 'Waiting' : 'Active';
+      newRow[colVisitCount - 1] = visitCount;
+
+      if (isWaitlisted) {
+        newRow[colWaitlistTime - 1] = currentTime;
+      } else {
+        newRow[colCheckInTime - 1] = currentTime;
+      }
+
+      trackerSheet.appendRow(newRow);
+      rowToUpdate = trackerSheet.getLastRow();
     } else {
-      trackerSheet.getRange(rowToUpdate, colCheckInTime).setValue(currentTime); // Column I: Check-In Time
-      trackerSheet.getRange(rowToUpdate, colSessionStatus).setValue("Active"); // Column P: Session Status
-      trackerSheet.getRange(rowToUpdate, colVRSpace).setValue(selectedSpace); // Column O: VR Space
-    }
-    // Set common fields
-    trackerSheet.getRange(rowToUpdate, colGame).setValue(selectedGame); // Column N: Game
-    trackerSheet.getRange(rowToUpdate, colVisitCount).setValue(getVisitCount(trackerSheet, attendee.uniqueId)); // Column Q: Visit Count
-  }
+      // Update existing row
+      var updateRange = trackerSheet.getRange(rowToUpdate, 1, 1, trackerSheet.getLastColumn());
+      var rowData = updateRange.getValues()[0];
 
-  // Update formulas for durations
-  trackerSheet.getRange(rowToUpdate, colWaitlistDuration).setFormula('=IF(H' + rowToUpdate + '="", "N/A", NOW()-H' + rowToUpdate + ')'); // Column K: Waitlist Duration
-  trackerSheet.getRange(rowToUpdate, colSessionDuration).setFormula('=IF(I' + rowToUpdate + '="", "N/A", NOW()-I' + rowToUpdate + ')'); // Column L: Session Duration
-  trackerSheet.getRange(rowToUpdate, colTotalDuration).setFormula('=IF(K' + rowToUpdate + '="N/A", L' + rowToUpdate + ', K' + rowToUpdate + ')'); // Column M: Total Duration
+      if (isWaitlisted) {
+        rowData[colWaitlistTime - 1] = currentTime;
+        rowData[colSessionStatus - 1] = 'Waiting';
+        rowData[colVRSpace - 1] = 'Waitlist';
+      } else {
+        rowData[colCheckInTime - 1] = currentTime;
+        rowData[colSessionStatus - 1] = 'Active';
+        rowData[colVRSpace - 1] = selectedSpace;
+      }
+
+      rowData[colGame - 1] = selectedGame;
+      rowData[colVisitCount - 1] = visitCount;
+
+      updateRange.setValues([rowData]);
+    }
+
+    // Update durations
+    updateDurations(trackerSheet, rowToUpdate);
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('An error occurred while updating the Tracker for group check-in: ' + error.message);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -957,26 +1053,39 @@ function promptForGroupWaitlist(groupMembers, selectedGame, groupSize, groupNumb
  * @param {string} sessionId - The session ID.
  */
 function updateVRSpaces(vrSheet, selectedSpace, attendee, selectedGame, sessionId) {
-  var data = vrSheet.getDataRange().getValues();
-  var rowToUpdate = -1;
+  var lock = LockService.getDocumentLock();
+  try {
+    lock.waitLock(10000); // Wait up to 10 seconds for the lock
 
-  // Find the row corresponding to the selected VR space
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === selectedSpace) { // Column A: VR Space
-      rowToUpdate = i + 1;
-      break;
+    var dataRange = vrSheet.getDataRange();
+    var data = dataRange.getValues();
+    var rowToUpdate = -1;
+
+    // Find the row corresponding to the selected VR space
+    for (var i = 1; i < data.length; i++) { // Assuming the first row is headers
+      if (data[i][0] === selectedSpace) { // Column A: VR Space
+        rowToUpdate = i + 1;
+        break;
+      }
     }
-  }
 
-  if (rowToUpdate !== -1) {
-    vrSheet.getRange(rowToUpdate, 3).setValue("Occupied");               // Column C: Status
-    vrSheet.getRange(rowToUpdate, 4).setValue(attendee.firstName);        // Column D: First Name
-    vrSheet.getRange(rowToUpdate, 5).setValue(selectedGame);              // Column E: Game
-    vrSheet.getRange(rowToUpdate, 6).setValue(sessionId);                 // Column F: Session ID
-    vrSheet.getRange(rowToUpdate, 7).setValue(new Date());                // Column G: Check-In Time
-    // Column H: Duration remains untouched as per the requirement
-  } else {
-    throw new Error("VR Space not found: " + selectedSpace);
+    if (rowToUpdate !== -1) {
+      var updateRange = vrSheet.getRange(rowToUpdate, 3, 1, 5); // Columns C to G
+      var rowData = [
+        'Occupied',         // Column C: Status
+        attendee.firstName, // Column D: First Name
+        selectedGame,       // Column E: Game
+        sessionId,          // Column F: Session ID
+        new Date()          // Column G: Check-In Time
+      ];
+      updateRange.setValues([rowData]);
+    } else {
+      throw new Error("VR Space not found: " + selectedSpace);
+    }
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('An error occurred while updating VR Spaces: ' + error.message);
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -1097,28 +1206,46 @@ function processCheckOut(selectedSpaces) {
  * @param {Date} checkOutTime - The check-out time.
  */
 function updateCheckOutTracker(trackerSheet, space, checkOutTime) {
-  var data = trackerSheet.getDataRange().getValues();
-  var rowToUpdate = -1;
+  var lock = LockService.getDocumentLock();
+  try {
+    lock.waitLock(10000); // Wait up to 10 seconds for the lock
 
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][14] === space && !data[i][9]) { // Column O: VR Space, Column J: Check-Out Time
-      rowToUpdate = i + 1;
-      break;
+    var dataRange = trackerSheet.getDataRange();
+    var data = dataRange.getValues();
+    var rowToUpdate = -1;
+
+    // Define column indices
+    var colVRSpace = 15;        // Column O
+    var colCheckOutTime = 10;   // Column J
+    var colSessionStatus = 16;  // Column P
+
+    for (var i = data.length - 1; i >= 1; i--) { // Start from the bottom
+      if (data[i][colVRSpace - 1] === space && !data[i][colCheckOutTime - 1]) {
+        rowToUpdate = i + 1;
+        break;
+      }
     }
+
+    if (rowToUpdate === -1) {
+      throw new Error('No active session found for VR Space: ' + space);
+    }
+
+    var updateRange = trackerSheet.getRange(rowToUpdate, 1, 1, trackerSheet.getLastColumn());
+    var rowData = updateRange.getValues()[0];
+
+    rowData[colCheckOutTime - 1] = checkOutTime;
+    rowData[colSessionStatus - 1] = 'Completed';
+
+    updateRange.setValues([rowData]);
+
+    // Update durations
+    updateDurations(trackerSheet, rowToUpdate);
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('An error occurred while updating the check-out in Tracker: ' + error.message);
+  } finally {
+    lock.releaseLock();
   }
-
-  if (rowToUpdate === -1) {
-    throw new Error('No active session found for VR Space: ' + space);
-  }
-
-  trackerSheet.getRange(rowToUpdate, 10).setValue(checkOutTime); // Column J: Check-Out Time
-
-  // Update formulas for durations
-  trackerSheet.getRange(rowToUpdate, 11).setFormula('=IF(H' + rowToUpdate + '="","N/A",NOW()-H' + rowToUpdate + ')'); // Column K: Waitlist Duration
-  trackerSheet.getRange(rowToUpdate, 12).setFormula('=IF(I' + rowToUpdate + '="","N/A",NOW()-I' + rowToUpdate + ')'); // Column L: Session Duration
-  trackerSheet.getRange(rowToUpdate, 13).setFormula('=IF(K' + rowToUpdate + '="N/A", L' + rowToUpdate + ', K' + rowToUpdate + ')'); // Column M: Total Duration
-
-  trackerSheet.getRange(rowToUpdate, 16).setValue("Completed"); // Column P: Session Status
 }
 
 /**
@@ -1127,15 +1254,32 @@ function updateCheckOutTracker(trackerSheet, space, checkOutTime) {
  * @param {string} space - The VR space to free.
  */
 function freeVRSpace(vrSheet, space) {
-  var data = vrSheet.getDataRange().getValues();
+  var lock = LockService.getDocumentLock();
+  try {
+    lock.waitLock(10000); // Wait up to 10 seconds for the lock
 
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === space) { // Column A: VR Space
-      vrSheet.getRange(i + 1, 3).setValue("Available"); // Column C: Status
-      vrSheet.getRange(i + 1, 4, 1, 4).clearContent(); // Columns D-G: Clear attendee info
-      // Column H: Duration remains untouched
-      break;
+    var dataRange = vrSheet.getDataRange();
+    var data = dataRange.getValues();
+    var rowToUpdate = -1;
+
+    for (var i = 1; i < data.length; i++) { // Assuming the first row is headers
+      if (data[i][0] === space) { // Column A: VR Space
+        rowToUpdate = i + 1;
+        break;
+      }
     }
+
+    if (rowToUpdate !== -1) {
+      var updateRange = vrSheet.getRange(rowToUpdate, 3, 1, 5); // Columns C to G
+      var emptyData = ['', '', '', '', '']; // Clear Status, First Name, Game, Session ID, Check-In Time
+      updateRange.setValues([['Available'].concat(emptyData.slice(1))]); // Set Status to 'Available', clear the rest
+    } else {
+      throw new Error("VR Space not found: " + space);
+    }
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('An error occurred while freeing VR Space: ' + error.message);
+  } finally {
+    lock.releaseLock();
   }
 }
 

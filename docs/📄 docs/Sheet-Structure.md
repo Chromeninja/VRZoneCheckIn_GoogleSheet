@@ -1,6 +1,6 @@
 # Google Sheet Structure for VR Zone Group Check-In System
 
-The VR Zone Group Check-In System uses a Google Sheet with multiple tabs to manage and track attendee check-ins, games, VR space assignments, and more. Below is an overview of the key sheets, including the **Waitlist Sheet** you've requested.
+The VR Zone Group Check-In System uses a Google Sheet with multiple tabs to manage and track attendee check-ins, games, VR space assignments, and more. Below is an overview of the key sheets, including the **Waitlist Sheet** and the corrected **Legal Sheet** structure.
 
 ## 1. **VRSpaces Sheet**
 
@@ -37,10 +37,12 @@ Logs every check-in and check-out with details for each session.
 | **Full Name**  | Full name (combination of First and Last name)                 |
 | **Group Leader** | Name of the group leader (for group check-ins)               |
 | **Group Number** | Number representing the group size                          |
+| **Waitlist Time** | Timestamp when added to the waitlist                       |
 | **Check-In Time** | Timestamp when the attendee checked in                     |
 | **Check-Out Time** | Timestamp when the attendee checked out                   |
 | **Waitlist Duration** | Total time spent on the waitlist                       |
 | **Session Duration** | Total time spent playing the game                       |
+| **Total Duration** | Total time spent on waitlist + session time                |
 | **Game**       | The game the attendee selected                                 |
 | **VR Space**   | The VR station assigned to the attendee                        |
 | **Session Status** | Status of the session (Active/Completed)                  |
@@ -57,24 +59,25 @@ Prefilled formulas for:
 
 Stores legal waiver and user consent details, imported from a Google Form.
 
-| Column        | Description                                                   |
-|---------------|---------------------------------------------------------------|
-| **Timestamp** | Time when the attendee submitted the form                      |
-| **First Name** | First name of the attendee                                    |
-| **Last Name** | Last name of the attendee                                      |
-| **Email**     | Attendee’s email address                                       |
-| **Minor**     | Whether the attendee is a minor (Yes/No)                       |
-| **Age**       | Age of the attendee                                            |
-| **Gender**    | Gender of the attendee                                         |
-| **Played VR Before** | Whether the attendee has prior VR experience (Yes/No)  |
-| **Own VR**    | Whether the attendee owns a VR headset (Yes/No)                |
-| **Likely to Buy VR** | Likelihood of purchasing a VR headset (Rating)         |
-| **Guardian First Name** | Guardian's first name (if a minor)                   |
-| **Guardian Last Name** | Guardian's last name (if a minor)                     |
-| **Mobile Number** | Attendee's or guardian's mobile number                     |
-| **Liability Waiver** | Whether the attendee agreed to the liability waiver (Yes/No) |
-| **E-Sign Consent** | Whether the attendee agreed to electronic signature (Yes/No) |
-| **Unique ID** | Unique identifier for the attendee                             |
+| Column                | Description                                                   |
+|-----------------------|---------------------------------------------------------------|
+| **Timestamp**         | Time when the attendee submitted the form                      |
+| **Email Address**     | Attendee’s email address                                      |
+| **Newsletter Signup** | Whether the attendee signed up for the newsletter             |
+| **First Name**        | First name of the attendee                                     |
+| **Last Name**         | Last name of the attendee                                      |
+| **Minor**             | Whether the attendee is a minor (Yes/No)                       |
+| **Age**               | Age of the attendee                                            |
+| **Gender**            | Gender of the attendee                                         |
+| **Played VR Before**  | Whether the attendee has prior VR experience (Yes/No)          |
+| **Own VR**            | Whether the attendee owns a VR headset (Yes/No)                |
+| **Likely to Buy VR**  | Likelihood of purchasing a VR headset (Rating)                 |
+| **Guardian First Name**| Guardian's first name (if the attendee is a minor)            |
+| **Guardian Last Name** | Guardian's last name (if the attendee is a minor)             |
+| **Mobile Number**     | Attendee's or guardian's mobile number                         |
+| **Liability Waiver**  | Whether the attendee agreed to the liability waiver (Yes/No)   |
+| **E-Sign Consent**    | Whether the attendee agreed to electronic signature (Yes/No)   |
+| **Unique ID**         | Unique identifier for the attendee                             |
 
 ## 4. **Waitlist Sheet**
 
