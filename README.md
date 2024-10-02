@@ -5,11 +5,9 @@ The **VR Zone Group Check-In System** is designed to manage the check-in, game s
 ## Table of Contents
 1. [Project Overview](#project-overview)
 2. [File Structure](#file-structure)
-3. [Google Sheets Structure](#google-sheets-structure)
-4. [Features](#features)
-5. [How to Set Up](#how-to-set-up)
-6. [Contributing](#contributing)
-7. [License](#license)
+3. [Features](#features)
+4. [Contributing](#contributing)
+5. [License](#license)
 
 ---
 
@@ -40,50 +38,10 @@ The repository contains the following files and folders:
 |-- LICENSE
 ```
 
-
-#Breakdown of Key Files:
-
-
-
-## Google Sheets Structure
-
-The system relies on several Google Sheets that store data for tracking VR spaces, attendees, and session logs.
-
-- **VRSpaces**: Tracks the availability and assignment of VR stations.
-    - Columns: 
-      - VR Space
-      - Supported Games
-      - Status (Available, Assigned, Occupied)
-      - Attendee Name
-      - Session ID
-      - Check-In Time
-      - Duration (optional)
-
-- **Check-In Tracker**: Logs all check-ins and check-outs for session tracking and analytics.
-    - Columns:
-      - Session ID
-      - Unique ID
-      - First Name
-      - Last Name
-      - Game
-      - VR Space
-      - Check-In Time
-      - Check-Out Time
-      - Session Duration
-      - Visit Count
-      - Group Number (if applicable)
-
-- **Waitlist**: Tracks attendees who are waiting for a VR space to become available.
-    - Columns:
-      - Session ID
-      - First Name
-      - Phone Number
-      - Game
-      - Waitlist Time
-      - Notification Time
-      - Group Number (if applicable)
-
----
+### Breakdown of Key Files:
+- **HTML Templates**: Custom popups and forms used for interactions like game selection, space assignment, and check-out.
+- **Code.gs**: Main Google Apps Script file that handles backend logic like managing check-ins, updating Google Sheets, and handling waitlists.
+- **docs/**: Documentation files providing additional project overviews and system details.
 
 ## Features
 
@@ -135,18 +93,6 @@ The system relies on several Google Sheets that store data for tracking VR space
 ### Step 5: Testing
 - Run the system by using the menu created in Google Sheets. You can start with an individual check-in or group check-in to ensure everything works as expected.
 
----
-
-## Contributing
-
-We welcome contributions to improve the VR Zone Group Check-In System! To contribute:
-1. Fork the repository.
-2. Create a new branch with your feature or fix.
-3. Open a pull request with a clear description of your changes.
-
-For major changes, please open an issue first to discuss what you would like to improve.
-
----
 
 ## License
 

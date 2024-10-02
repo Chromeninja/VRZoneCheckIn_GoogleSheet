@@ -47,10 +47,6 @@ function getAttendeeInfo(firstName, lastName) {
             firstName: data[i][3], // Column D: Index 3
             lastName: data[i][4],  // Column E: Index 4
             phoneNumber: data[i][13], // Column N: Index 13
-            isMinor: data[i][5].toString().trim().toLowerCase() === 'yes', // Column F: Index 5
-            email: data[i][1], // Column B: Index 1
-            guardianFirstName: data[i][11], // Column L: Index 11
-            guardianLastName: data[i][12]  // Column M: Index 12
           });
         }
       } else {
@@ -59,10 +55,6 @@ function getAttendeeInfo(firstName, lastName) {
           firstName: data[i][3], // Column D: Index 3
           lastName: data[i][4],  // Column E: Index 4
           phoneNumber: data[i][13], // Column N: Index 13
-          isMinor: data[i][5].toString().trim().toLowerCase() === 'yes', // Column F: Index 5
-          email: data[i][1], // Column B: Index 1
-          guardianFirstName: data[i][11], // Column L: Index 11
-          guardianLastName: data[i][12]  // Column M: Index 12
         });
       }
     }
@@ -225,6 +217,9 @@ function getIndividualAttendeeInfo() {
   var ui = SpreadsheetApp.getUi();
   var firstNameResponse, firstName, lastName, matches;
 
+  // Load attendee data from cache or sheet
+  var attendeeData = getCachedAttendeeData();
+
   // Retry loop for first name
   while (true) {
     firstNameResponse = ui.prompt('Individual Check-In', 'Please enter the first name of the attendee:', ui.ButtonSet.OK_CANCEL);
@@ -240,7 +235,7 @@ function getIndividualAttendeeInfo() {
       continue; // Retry entering first name
     }
 
-    matches = getAttendeeInfo(firstName);
+    matches = findAttendeesByFirstName(attendeeData, firstName);
 
     if (matches.length === 1) {
       var attendee = matches[0];
@@ -265,7 +260,7 @@ function getIndividualAttendeeInfo() {
           continue; // Retry entering last name
         }
 
-        matches = getAttendeeInfo(firstName, lastName);
+        matches = findAttendeesByFullName(attendeeData, firstName, lastName);
 
         if (matches.length >= 1) {
           var attendee = matches[0]; // Pick the first match
@@ -287,8 +282,7 @@ function getIndividualAttendeeInfo() {
  */
 function promptForGameSelection(attendee, sessionId) {
   try {
-    var vrSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VRSpaces');
-    var supportedGames = findAvailableGames(vrSheet);
+    var supportedGames = getCachedSupportedGames();
     if (supportedGames.length === 0) {
       SpreadsheetApp.getUi().alert('No supported games found.');
       return;
@@ -310,6 +304,19 @@ function promptForGameSelection(attendee, sessionId) {
   }
 }
 
+function getCachedSupportedGames() {
+  var cache = CacheService.getScriptCache();
+  var cachedGames = cache.get('supportedGames');
+  if (cachedGames) {
+    return JSON.parse(cachedGames);
+  } else {
+    var vrSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VRSpaces');
+    var supportedGames = findAvailableGames(vrSheet);
+    cache.put('supportedGames', JSON.stringify(supportedGames), 300); // Cache for 5 minutes
+    return supportedGames;
+  }
+}
+
 /**
  * Handles the game selection from the HTML dialog.
  * @param {string} selectedGame - The game selected by the user.
@@ -317,7 +324,10 @@ function promptForGameSelection(attendee, sessionId) {
  * @param {string} sessionId - The session ID.
  */
 function selectGame(selectedGame, sessionId) {
+  var lock = LockService.getDocumentLock();
   try {
+    lock.waitLock(10000); // Wait up to 10 seconds for the lock
+
     // Retrieve attendee data from script properties
     var scriptProperties = PropertiesService.getScriptProperties();
     var attendeeDataJSON = scriptProperties.getProperty('attendee_' + sessionId);
@@ -326,7 +336,7 @@ function selectGame(selectedGame, sessionId) {
 
     var vrSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VRSpaces');
 
-    var availableSpaces = findAvailableSpacesForGame(selectedGame, vrSheet);
+    var availableSpaces = findAvailableSpacesForGameCached(selectedGame);
 
     if (availableSpaces.length > 0) {
       // Prompt for VR space selection
@@ -338,9 +348,35 @@ function selectGame(selectedGame, sessionId) {
     }
   } catch (error) {
     SpreadsheetApp.getUi().alert('An error occurred during game selection: ' + error.message);
+  } finally {
+    lock.releaseLock();
   }
 }
 
+function findAvailableSpacesForGameCached(selectedGame) {
+  var cache = CacheService.getScriptCache();
+  var cacheKey = 'availableSpaces_' + selectedGame;
+  var cachedSpaces = cache.get(cacheKey);
+  
+  if (cachedSpaces) {
+    try {
+      return JSON.parse(cachedSpaces);
+    } catch (e) {
+      // If parsing fails, invalidate the cache and fetch fresh data
+      cache.remove(cacheKey);
+    }
+  }
+  
+  try {
+    var vrSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VRSpaces');
+    var availableSpaces = findAvailableSpacesForGame(selectedGame, vrSheet);
+    cache.put(cacheKey, JSON.stringify(availableSpaces), 300); // Cache for 5 minutes
+    return availableSpaces;
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('Error fetching available spaces: ' + error.message);
+    return [];
+  }
+}
 
 /**
  * Prompts the user to select a VR space from available spaces.
@@ -374,14 +410,16 @@ function promptForVRSpaceSelection(availableSpaces, attendee, selectedGame, sess
  * @param {string} sessionId - The session ID.
  */
 function selectVRSpace(selectedSpace, selectedGame, sessionId) {
+  var lock = LockService.getDocumentLock();
   try {
+    lock.waitLock(10000); // Wait up to 10 seconds for the lock
+
     // Retrieve attendee data from script properties
     var scriptProperties = PropertiesService.getScriptProperties();
     var attendeeDataJSON = scriptProperties.getProperty('attendee_' + sessionId);
     var attendee = JSON.parse(attendeeDataJSON);
     scriptProperties.deleteProperty('attendee_' + sessionId); // Clean up
 
-    // Continue with your logic
     var vrSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VRSpaces');
     var trackerSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tracker');
 
@@ -389,9 +427,20 @@ function selectVRSpace(selectedSpace, selectedGame, sessionId) {
     updateCheckInTracker(trackerSheet, attendee, selectedSpace, selectedGame, sessionId, false);
     updateVRSpaces(vrSheet, selectedSpace, attendee, selectedGame, sessionId);
     SpreadsheetApp.getUi().alert('Attendee checked in to ' + selectedSpace + ' with game ' + selectedGame + '.');
+
+    // Invalidate the cache for the selected game
+    invalidateAvailableSpacesCache(selectedGame);
   } catch (error) {
     SpreadsheetApp.getUi().alert('An error occurred while assigning VR space: ' + error.message);
+  } finally {
+    lock.releaseLock();
   }
+}
+
+function invalidateAvailableSpacesCache(selectedGame) {
+  var cache = CacheService.getScriptCache();
+  var cacheKey = 'availableSpaces_' + selectedGame;
+  cache.remove(cacheKey);
 }
 
 /**
@@ -523,20 +572,56 @@ function updateDurations(trackerSheet, row) {
  * @returns {number} - The updated visit count.
  */
 function getVisitCount(trackerSheet, uniqueId) {
-  var data = trackerSheet.getDataRange().getValues();
-  var visitCount = 1;
+  var dataRange = trackerSheet.getRange('B2:B'); // Column B: Unique ID
+  var data = dataRange.getValues();
+  var visitCount = 0;
 
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][1] === uniqueId) { // Column B: Unique ID
-      var previousVisitCount = data[i][16]; // Column Q: Visit Count
-      if (previousVisitCount && !isNaN(previousVisitCount)) {
-        visitCount = Math.max(visitCount, parseInt(previousVisitCount) + 1);
-      }
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][0] === uniqueId) {
+      visitCount++;
     }
   }
-  return visitCount;
+  return visitCount + 1; // Adding 1 for the current visit
 }
 
+function getCachedAttendeeData() {
+  var cache = CacheService.getScriptCache();
+  var cachedData = cache.get('attendeeData');
+  if (cachedData) {
+    return JSON.parse(cachedData);
+  } else {
+    var legalSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Legal');
+    var lastRow = legalSheet.getLastRow();
+    if (lastRow < 2) return []; // No data
+
+    var dataRange = legalSheet.getRange(2, 1, lastRow - 1, 17);
+    var data = dataRange.getValues();
+
+    var attendeeData = data.map(function(row) {
+      return {
+        uniqueId: row[16],
+        firstName: row[3] ? row[3].toLowerCase().trim() : '',
+        lastName: row[4] ? row[4].toLowerCase().trim() : '',
+        phoneNumber: row[13]
+      };
+    });
+
+    cache.put('attendeeData', JSON.stringify(attendeeData), 300); // Cache for 5 minutes
+    return attendeeData;
+  }
+}
+
+function findAttendeesByFirstName(attendeeData, firstName) {
+  return attendeeData.filter(function(attendee) {
+    return attendee.firstName === firstName;
+  });
+}
+
+function findAttendeesByFullName(attendeeData, firstName, lastName) {
+  return attendeeData.filter(function(attendee) {
+    return attendee.firstName === firstName && attendee.lastName === lastName;
+  });
+}
 
 // =========================
 // Group Check-In Functions
@@ -1261,10 +1346,12 @@ function freeVRSpace(vrSheet, space) {
     var dataRange = vrSheet.getDataRange();
     var data = dataRange.getValues();
     var rowToUpdate = -1;
+    var selectedGame = '';
 
     for (var i = 1; i < data.length; i++) { // Assuming the first row is headers
       if (data[i][0] === space) { // Column A: VR Space
         rowToUpdate = i + 1;
+        selectedGame = data[i][1]; // Column B: Supported Games
         break;
       }
     }
@@ -1273,6 +1360,12 @@ function freeVRSpace(vrSheet, space) {
       var updateRange = vrSheet.getRange(rowToUpdate, 3, 1, 5); // Columns C to G
       var emptyData = ['', '', '', '', '']; // Clear Status, First Name, Game, Session ID, Check-In Time
       updateRange.setValues([['Available'].concat(emptyData.slice(1))]); // Set Status to 'Available', clear the rest
+
+      // Invalidate the cache for the affected game(s)
+      var supportedGames = selectedGame.split(',').map(function(game) { return game.trim(); });
+      supportedGames.forEach(function(game) {
+        invalidateAvailableSpacesCache(game);
+      });
     } else {
       throw new Error("VR Space not found: " + space);
     }
