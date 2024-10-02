@@ -364,6 +364,7 @@ function findAvailableSpacesForGameCached(selectedGame) {
     } catch (e) {
       // If parsing fails, invalidate the cache and fetch fresh data
       cache.remove(cacheKey);
+      Logger.log('Cache parsing error for key ' + cacheKey + ': ' + e.message);
     }
   }
   
@@ -633,85 +634,199 @@ function findAttendeesByFullName(attendeeData, firstName, lastName) {
 function groupCheckIn() {
   var ui = SpreadsheetApp.getUi();
   try {
-    // Prompt for the number of people in the group
-    var groupSizeResponse = ui.prompt('Group Check-In', 'Enter the number of people in the group:', ui.ButtonSet.OK_CANCEL);
-    if (groupSizeResponse.getSelectedButton() !== ui.Button.OK) {
-      ui.alert('Operation cancelled.');
-      return;
-    }
-    var groupSize = parseInt(groupSizeResponse.getResponseText());
-    if (isNaN(groupSize) || groupSize <= 0) {
-      ui.alert('Invalid group size.');
-      return;
-    }
+    // Step 1: Collect Group Information
+    var groupInfo = collectGroupInformation();
+    if (!groupInfo) return;
 
-    // Prompt for the group leader's first name
-    var groupLeaderFirstName = ui.prompt('Group Check-In', 'Enter the first name of the group leader:', ui.ButtonSet.OK_CANCEL).getResponseText().trim();
-    var groupLeaderLastName = '';						
-    if (!groupLeaderFirstName) {
-      ui.alert('Group leader\'s first name is required.');
-      return;
-    }
+    // Step 2: Verify Group Members
+    var groupMembers = verifyGroupMembers(groupInfo);
+    if (!groupMembers) return;
 
-    // Check for duplicate first names for group leader
-    if (checkDuplicateFirstName(groupLeaderFirstName)) {
-      groupLeaderLastName = ui.prompt('Group Check-In', 'Multiple attendees found with the first name "' + capitalize(groupLeaderFirstName) + '". Please enter the last name of the group leader:', ui.ButtonSet.OK_CANCEL).getResponseText().trim();
-      if (!groupLeaderLastName) {
-        ui.alert('Group leader\'s last name is required.');
-        return;
-      }
-    }
-
-    // Verify group leader's information
-    var groupLeader = verifyGroupMember(groupLeaderFirstName, groupLeaderLastName, 'Group Leader');
-    if (!groupLeader) return;
-    var groupMembers = [groupLeader];
-
-    // Collect and verify each group member's information
-    for (var i = 2; i <= groupSize; i++) {
-      var memberFirstName = ui.prompt('Group Check-In', 'Enter the first name of group member ' + i + ':', ui.ButtonSet.OK_CANCEL).getResponseText().trim();
-      var memberLastName = '';
-      if (!memberFirstName) {
-        ui.alert('Group member ' + i + '\'s first name is required.');
-        return;
-      }
-
-      // Check for duplicate first names for group member
-      if (checkDuplicateFirstName(memberFirstName)) {
-        memberLastName = ui.prompt('Group Check-In', 'Multiple attendees found with the first name "' + capitalize(memberFirstName) + '". Please enter the last name of group member ' + i + ':', ui.ButtonSet.OK_CANCEL).getResponseText().trim();
-        if (!memberLastName) {
-          ui.alert('Group member ' + i + '\'s last name is required.');
-          return;
-        }
-      }
-
-      var groupMember = verifyGroupMember(memberFirstName, memberLastName, 'Group Member ' + i);
-      if (!groupMember) return;
-      groupMembers.push(groupMember);
-    }
-
-    // Store group information in script properties
+    // Step 3: Store group data
     var scriptProperties = PropertiesService.getScriptProperties();
-    scriptProperties.setProperty('groupSize', groupSize.toString());
     scriptProperties.setProperty('groupMembers', JSON.stringify(groupMembers));
-    var vrSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VRSpaces');
-    var supportedGames = findAvailableGames(vrSheet);
 
-    if (supportedGames.length === 0) {
-      ui.alert('No supported games found.');
-      return;
-    }
-
-    // Prompt for game selection for the group
-    var gameSelectionTemplate = HtmlService.createTemplateFromFile('GameSelectionGroup');
-    gameSelectionTemplate.supportedGames = supportedGames;
-
-    var gameHtmlOutput = gameSelectionTemplate.evaluate().setWidth(300).setHeight(200);
-    SpreadsheetApp.getUi().showModalDialog(gameHtmlOutput, 'Select Game for Group');
+    // Step 4: Prompt for Game Selection
+    promptForGroupGameSelection();
 
   } catch (error) {
     ui.alert('An error occurred during group check-in: ' + error.message);
   }
+}
+
+function collectGroupInformation() {
+  var ui = SpreadsheetApp.getUi();
+  // Prompt for the number of people in the group
+  var groupSizeResponse = ui.prompt('Group Check-In', 'Enter the number of people in the group:', ui.ButtonSet.OK_CANCEL);
+  if (groupSizeResponse.getSelectedButton() !== ui.Button.OK) {
+    ui.alert('Operation cancelled.');
+    return null;
+  }
+  var groupSize = parseInt(groupSizeResponse.getResponseText());
+  if (isNaN(groupSize) || groupSize <= 0) {
+    ui.alert('Invalid group size.');
+    return null;
+  }
+
+  // Prompt for the group leader's first name
+  var groupLeaderFirstNameResponse = ui.prompt('Group Check-In', 'Enter the first name of the group leader:', ui.ButtonSet.OK_CANCEL);
+  if (groupLeaderFirstNameResponse.getSelectedButton() !== ui.Button.OK) {
+    ui.alert('Operation cancelled.');
+    return null;
+  }
+  var groupLeaderFirstName = groupLeaderFirstNameResponse.getResponseText().trim();
+  if (!groupLeaderFirstName) {
+    ui.alert('Group leader\'s first name is required.');
+    return null;
+  }
+
+  return {
+    groupSize: groupSize,
+    groupLeaderFirstName: groupLeaderFirstName
+  };
+}
+
+function verifyGroupMembers(groupInfo) {
+  var ui = SpreadsheetApp.getUi();
+  var groupMembers = [];
+  var attendeeData = getCachedAttendeeData();
+  var groupSize = groupInfo.groupSize;
+  var groupLeaderFirstName = groupInfo.groupLeaderFirstName;
+
+  // Verify group leader
+  var groupLeader = verifyGroupMember(groupLeaderFirstName, 'Group Leader', attendeeData);
+  if (!groupLeader) return null;
+  groupMembers.push(groupLeader);
+
+  // Collect and verify each group member's information
+  for (var i = 2; i <= groupSize; i++) {
+    var memberFirstNameResponse = ui.prompt('Group Check-In', 'Enter the first name of group member ' + i + ':', ui.ButtonSet.OK_CANCEL);
+    if (memberFirstNameResponse.getSelectedButton() !== ui.Button.OK) {
+      ui.alert('Operation cancelled.');
+      return null;
+    }
+    var memberFirstName = memberFirstNameResponse.getResponseText().trim();
+    if (!memberFirstName) {
+      ui.alert('Group member ' + i + '\'s first name is required.');
+      return null;
+    }
+
+    var groupMember = verifyGroupMember(memberFirstName, 'Group Member ' + i, attendeeData);
+    if (!groupMember) return null;
+    groupMembers.push(groupMember);
+  }
+
+  return groupMembers;
+}
+
+function promptForGroupGameSelection() {
+  var ui = SpreadsheetApp.getUi();
+  var supportedGames = getCachedSupportedGames();
+  if (supportedGames.length === 0) {
+    ui.alert('No supported games found.');
+    return;
+  }
+
+  var template = HtmlService.createTemplateFromFile('GameSelectionGroup');
+  template.supportedGames = supportedGames;
+
+  var htmlOutput = template.evaluate().setWidth(300).setHeight(200);
+  ui.showModalDialog(htmlOutput, 'Select Game for Group');
+}
+
+function finalizeGroupCheckIn(selectedSpaces, groupMembersJSON, selectedGame, groupNumber) {
+  var lock = LockService.getDocumentLock();
+  try {
+    lock.waitLock(10000); // Wait up to 10 seconds for the lock
+
+    var groupMembers = JSON.parse(groupMembersJSON);
+    var vrSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VRSpaces');
+    var trackerSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tracker');
+
+    // Ensure selectedSpaces length matches groupMembers length
+    if (selectedSpaces.length !== groupMembers.length) {
+      SpreadsheetApp.getUi().alert('Error: The number of selected VR spaces does not match the number of group members.');
+      return;
+    }
+
+    // Prepare batch updates
+    var vrUpdates = [];
+    var trackerUpdates = [];
+
+    groupMembers.forEach(function(attendee, index) {
+      var selectedSpace = selectedSpaces[index];
+      var isLeader = (index === 0);
+
+      // Update Tracker
+      var trackerRow = prepareTrackerRowForGroup(attendee, selectedSpace, selectedGame, attendee.sessionId, isLeader, groupNumber, groupMembers[0]);
+      trackerUpdates.push(trackerRow);
+
+      // Update VRSpaces
+      var vrRow = prepareVRSpacesRow(selectedSpace, attendee, selectedGame, attendee.sessionId);
+      vrUpdates.push({ space: selectedSpace, data: vrRow });
+    });
+
+    // Apply batch updates to Tracker
+    appendRowsToSheet(trackerSheet, trackerUpdates);
+
+    // Apply batch updates to VRSpaces
+    updateVRSpacesBatch(vrSheet, vrUpdates);
+
+    // Invalidate caches
+    invalidateAvailableSpacesCache(selectedGame);
+
+    SpreadsheetApp.getUi().alert('Group check-in completed successfully.');
+
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('An error occurred during group check-in: ' + error.message);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function prepareTrackerRowForGroup(attendee, selectedSpace, selectedGame, sessionId, isLeader, groupNumber, groupLeader) {
+  var currentTime = new Date();
+  var fullName = attendee.firstName + ' ' + (attendee.lastName || '');
+  var groupLeaderFullName = groupLeader.firstName + ' ' + (groupLeader.lastName || '');
+  var visitCount = 1; // Simplified for batch processing; update if necessary
+
+  return [
+    sessionId,
+    attendee.uniqueId || '',
+    attendee.firstName,
+    attendee.lastName || '',
+    fullName,
+    groupLeaderFullName,
+    groupNumber || '',
+    '', // Waitlist Time
+    currentTime, // Check-In Time
+    '', // Check-Out Time
+    '', // Waitlist Duration
+    '', // Session Duration
+    '', // Total Duration
+    selectedGame,
+    selectedSpace,
+    'Active', // Session Status
+    visitCount,
+    '', // Notes
+    '', // Error Flag
+    '', // No Show
+  ];
+}
+
+function appendRowsToSheet(sheet, rowsData) {
+  sheet.getRange(sheet.getLastRow() + 1, 1, rowsData.length, rowsData[0].length).setValues(rowsData);
+}
+
+function prepareVRSpacesRow(selectedSpace, attendee, selectedGame, sessionId) {
+  var currentTime = new Date();
+  return [
+    'Occupied',
+    attendee.firstName,
+    selectedGame,
+    sessionId,
+    currentTime
+  ];
 }
 
 /**
@@ -723,60 +838,48 @@ function groupCheckIn() {
  * @param {string} role - The role of the group member (e.g., "Group Leader", "Group Member 2").
  * @returns {Object|null} - The attendee object or null if not found/cancelled.
  */
-function verifyGroupMember(firstName, lastName, role) {
+function verifyGroupMember(firstName, role, attendeeData) {
   var ui = SpreadsheetApp.getUi();
-  var matches = getAttendeeInfo(firstName, lastName);
+  var lastName = '';
+  var matches = findAttendeesByFirstName(attendeeData, firstName.toLowerCase());
 
-  // Retry loop for first and last name
   while (matches.length === 0) {
-    var retryFirstNameResponse = ui.prompt(role, 'No attendee found with the first name "' + capitalize(firstName) + '". Please try again or click Cancel to exit.', ui.ButtonSet.OK_CANCEL);
-    
-    if (retryFirstNameResponse.getSelectedButton() !== ui.Button.OK) {
+    var retryResponse = ui.prompt(role, 'No attendee found with the first name "' + capitalize(firstName) + '". Please try again or click Cancel to exit.', ui.ButtonSet.OK_CANCEL);
+    if (retryResponse.getSelectedButton() !== ui.Button.OK) {
       ui.alert('Operation cancelled.');
       return null;
     }
-    
-    firstName = retryFirstNameResponse.getResponseText().trim().toLowerCase();
+    firstName = retryResponse.getResponseText().trim();
     if (!firstName) {
       ui.alert('First name is required.');
-      continue; // Retry entering first name
+      continue;
     }
-
-    matches = getAttendeeInfo(firstName); // Re-run with the new first name
-
-    if (matches.length > 1) {
-      // Retry loop for last name if multiple matches found
-      var retryLastNameResponse = ui.prompt(role, 'Multiple attendees found with the first name "' + capitalize(firstName) + '". Please enter the last name or click Cancel to exit.', ui.ButtonSet.OK_CANCEL);
-      
-      if (retryLastNameResponse.getSelectedButton() !== ui.Button.OK) {
-        ui.alert('Operation cancelled.');
-        return null;
-      }
-      
-      lastName = retryLastNameResponse.getResponseText().trim().toLowerCase();
-      if (!lastName) {
-        ui.alert('Last name is required.');
-        continue; // Retry entering last name
-      }
-      
-      matches = getAttendeeInfo(firstName, lastName);
-    }
+    matches = findAttendeesByFirstName(attendeeData, firstName.toLowerCase());
   }
 
-  // If we get a single match or after retries, use the found member
+  if (matches.length > 1) {
+    var lastNameResponse = ui.prompt(role, 'Multiple attendees found with the first name "' + capitalize(firstName) + '". Please enter the last name:', ui.ButtonSet.OK_CANCEL);
+    if (lastNameResponse.getSelectedButton() !== ui.Button.OK) {
+      ui.alert('Operation cancelled.');
+      return null;
+    }
+    lastName = lastNameResponse.getResponseText().trim().toLowerCase();
+    if (!lastName) {
+      ui.alert('Last name is required.');
+      return null;
+    }
+    matches = findAttendeesByFullName(attendeeData, firstName.toLowerCase(), lastName);
+  }
+
   if (matches.length === 1) {
     return matches[0];
-  }
-
-  // If still multiple matches, use the first match but log the issue
-  if (matches.length > 1) {
-    setErrorFlag(SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tracker'), matches[0].uniqueId, role + ': Multiple matches found. Used first match.');
+  } else if (matches.length > 1) {
+    ui.alert('Multiple matches found for ' + role + '. Using the first match.');
     return matches[0];
+  } else {
+    ui.alert('No attendee found for ' + role + ' with the provided names.');
+    return null;
   }
-
-  // If no match after retries, return null
-  ui.alert('No attendee found with the provided names for ' + role + '.');
-  return null;
 }
 
 /**
@@ -784,7 +887,10 @@ function verifyGroupMember(firstName, lastName, role) {
  * @param {string} selectedGame - The game selected by the user for the group.
  */
 function selectGameGroup(selectedGame) {
+  var lock = LockService.getDocumentLock();
   try {
+    lock.waitLock(10000); // Wait up to 10 seconds for the lock
+
     var scriptProperties = PropertiesService.getScriptProperties();
     var groupMembersJSON = scriptProperties.getProperty('groupMembers');
 
@@ -797,39 +903,34 @@ function selectGameGroup(selectedGame) {
     var groupSize = groupMembers.length;
     var groupNumber = generateGroupNumber();
 
-    var vrSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('VRSpaces');
-    var availableSpaces = findAvailableSpacesForGame(selectedGame, vrSheet);
+    var availableSpaces = findAvailableSpacesForGameCached(selectedGame);
 
     if (availableSpaces.length < groupSize) {
       // Not enough spaces for the entire group
-      // Prompt to add the group to the waitlist
-      promptForGroupWaitlist(groupMembers, selectedGame, groupSize, groupNumber);
+      promptForGroupWaitlist(groupMembers, selectedGame, groupNumber);
       return;
     }
 
     // Generate session IDs for each group member
-    for (var i = 0; i < groupMembers.length; i++) {
-      var attendee = groupMembers[i];
-      var sessionId = generateSessionId(attendee.uniqueId || '');
-      attendee.sessionId = sessionId; // Store sessionId in the attendee object
-    }
+    groupMembers.forEach(function(member) {
+      member.sessionId = generateSessionId(member.uniqueId || '');
+    });
 
-    // Update the groupMembers in script properties
-    scriptProperties.setProperty('groupMembers', JSON.stringify(groupMembers));
-
-    // Proceed with the group VR space selection
+    // Proceed with VR space selection
     var template = HtmlService.createTemplateFromFile('GroupVRSpaceSelection');
     template.availableSpaces = availableSpaces;
     template.groupSize = groupSize;
     template.groupMembers = JSON.stringify(groupMembers).replace(/'/g, "\\'");
     template.selectedGame = selectedGame;
     template.groupNumber = groupNumber;
-    template.callbackFunction = 'assignVRSpacesToGroup'; // Ensure the correct callback function
+    template.callbackFunction = 'finalizeGroupCheckIn';
 
     var htmlOutput = template.evaluate().setWidth(400).setHeight(300);
     SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Assign VR Spaces to Group');
   } catch (error) {
     SpreadsheetApp.getUi().alert('An error occurred in selectGameGroup: ' + error.message);
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -900,17 +1001,6 @@ function assignVRSpacesToGroup(selectedSpaces, groupMembersJSON, selectedGame, g
   }
 }
 
-/**
- * Updates the Tracker sheet for group check-in and waitlist.
- * @param {Sheet} trackerSheet - The Tracker sheet.
- * @param {Object} attendee - The attendee object.
- * @param {string} selectedSpace - The assigned VR space or 'Waitlist'.
- * @param {string} selectedGame - The selected game.
- * @param {string} sessionId - The unique session ID for this attendee.
- * @param {boolean} isLeader - Indicates if the attendee is the group leader.
- * @param {string} groupNumber - The unique group number.
- * @param {Object} groupLeader - The group leader object.
- */
 /**
  * Updates the Tracker sheet for group check-in and waitlist.
  * @param {Sheet} trackerSheet - The Tracker sheet.
@@ -1028,42 +1118,72 @@ function updateCheckInTrackerGroup(trackerSheet, attendee, selectedSpace, select
  * @param {string} phoneNumber - Group leader's phone number for notifications.
  */
 function addGroupToWaitlist(groupMembers, selectedGame, groupNumber, phoneNumber) {
-  var waitlistSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Waitlist');
-  var trackerSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tracker');
-  var checkInTime = new Date();
+  // Acquire a document lock to prevent concurrent modifications
+  var lock = LockService.getDocumentLock();
+  try {
+    lock.waitLock(10000); // Wait up to 10 seconds for the lock
 
-  // Generate session IDs for each group member
-  for (var i = 0; i < groupMembers.length; i++) {
-    var member = groupMembers[i];
-    var sessionId = generateSessionId(member.uniqueId || '');
-    member.sessionId = sessionId; // Store sessionId in the member object
+    // Access the necessary sheets
+    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    var waitlistSheet = spreadsheet.getSheetByName('Waitlist');
+    var trackerSheet = spreadsheet.getSheetByName('Tracker');
+    var checkInTime = new Date();
+
+    // Generate session IDs for each group member
+    groupMembers.forEach(function(member) {
+      var sessionId = generateSessionId(member.uniqueId || '');
+      member.sessionId = sessionId; // Store sessionId in the member object
+    });
+
+    // Prepare data to append to the Waitlist sheet
+    var entries = [];
+    groupMembers.forEach(function(member, index) {
+      var sessionId = member.sessionId;
+      var isLeader = (index === 0); // First member is the group leader
+
+      entries.push([
+        sessionId,                          // Column A: Session ID
+        groupNumber,                        // Column B: Group Number
+        groupMembers[0].firstName,          // Column C: Group Leader
+        member.firstName,                   // Column D: FName
+        phoneNumber,                        // Column E: Phone Number
+        selectedGame,                       // Column F: Game
+        checkInTime,                        // Column G: WL Time
+        "",                                 // Column H: Time Notified
+        `=NOW()-G${waitlistSheet.getLastRow() + 1 + index}`, // Column I: Time Since Added
+        `=IF(H${waitlistSheet.getLastRow() + 1 + index}="", "", NOW()-H${waitlistSheet.getLastRow() + 1 + index})` // Column J: Time Since Notified
+      ]);
+
+      // Update the Tracker sheet for each member
+      updateCheckInTrackerGroup(
+        trackerSheet,
+        member,
+        'Waitlist',
+        selectedGame,
+        sessionId,
+        isLeader,
+        groupNumber,
+        groupMembers[0]
+      );
+    });
+
+    // Append all group members to the Waitlist sheet in a single operation
+    if (entries.length > 0) {
+      waitlistSheet
+        .getRange(waitlistSheet.getLastRow() + 1, 1, entries.length, entries[0].length)
+        .setValues(entries);
+    }
+
+    // Notify the user of successful addition
+    SpreadsheetApp.getUi().alert('Group has been added to the waitlist.');
+    
+  } catch (error) {
+    // Handle any errors that occur during the process
+    SpreadsheetApp.getUi().alert('An error occurred while adding the group to the waitlist: ' + error.message);
+  } finally {
+    // Always release the lock, even if an error occurs
+    lock.releaseLock();
   }
-
-  // Proceed to add each group member to the waitlist
-  for (var i = 0; i < groupMembers.length; i++) {
-    var member = groupMembers[i];
-    var sessionId = member.sessionId; // Use the sessionId generated earlier
-
-    // Add the group member to the waitlist
-    waitlistSheet.appendRow([
-      sessionId,                          // Column A: Session ID
-      groupNumber,                        // Column B: Group Number
-      groupMembers[0].firstName,          // Column C: Group Leader
-      member.firstName,                   // Column D: FName
-      phoneNumber,                        // Column E: Phone Number
-      selectedGame,                       // Column F: Game
-      checkInTime,                        // Column G: WL Time
-      "",                                 // Column H: Time Notified
-      '=NOW()-G' + waitlistSheet.getLastRow(), // Column I: Time Since Added
-      '=IF(H' + waitlistSheet.getLastRow() + '="", "", NOW()-H' + waitlistSheet.getLastRow() + ')' // Column J: Time Since Notified
-    ]);
-
-    // Now update the Tracker sheet
-    var isLeader = (i === 0); // First member is the group leader
-    updateCheckInTrackerGroup(trackerSheet, member, 'Waitlist', selectedGame, sessionId, isLeader, groupNumber, groupMembers[0]);
-  }
-
-  SpreadsheetApp.getUi().alert('Group has been added to the waitlist.');
 }
 
 /**
@@ -1374,6 +1494,23 @@ function freeVRSpace(vrSheet, space) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function updateVRSpacesBatch(vrSheet, vrUpdates) {
+  var data = vrSheet.getDataRange().getValues();
+  var vrSpaceRowMap = {};
+
+  for (var i = 1; i < data.length; i++) { // Skip header
+    var vrSpace = data[i][0];
+    vrSpaceRowMap[vrSpace] = i + 1; // Row number in the sheet
+  }
+
+  vrUpdates.forEach(function(update) {
+    var row = vrSpaceRowMap[update.space];
+    if (row) {
+      vrSheet.getRange(row, 3, 1, update.data.length).setValues([update.data]);
+    }
+  });
 }
 
 // =========================
